@@ -95,8 +95,11 @@ local ef_bad_length = ProtoExpert.new("swp.length.expert", "Bad length",
 local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
                                         expert.group.MALFORMED,
                                         expert.severity.ERROR);
+local ef_bad_dle = ProtoExpert.new("swp.baddle.expert", "Bad DLE sequence",
+                                        expert.group.MALFORMED,
+                                        expert.severity.ERROR);
 
-p_swp08.experts = {ef_bad_length, ef_bad_checksum}
+p_swp08.experts = {ef_bad_length, ef_bad_checksum, ef_bad_dle}
 
 local DLE = 0x10
 local STX = 2
@@ -176,24 +179,26 @@ function processPacket(mess, root, range)
     elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
-
     end
 
     tree:add(f_length, rangeByte(range, mess, #mess - 1))
     if (#mess - 2) ~= mess[#mess - 1] then
         tree:add_proto_expert_info(ef_bad_length)
     end
+
+    -- validate checksum
+    local sum = 0
+    for i = 1, #mess - 1, 1 do sum = sum + mess[i] end
+
+    if bit32.band(-sum, 0xff) ~= mess[#mess] then
+        tree:add_proto_expert_info(ef_bad_checksum)
+
+    end
     tree:add(f_checksum, rangeByte(range, mess, #mess))
 end
 
-function processACK(root, range)
-    --   print("Process Ack")
-    root:add(range, "SW-P-08 ACK")
-end
-function processNAK(root, range)
-    --    print("Process NAK")
-    root:add(range, "SW-P-08 NAK")
-end
+function processACK(root, range) root:add(range, "SW-P-08 ACK") end
+function processNAK(root, range) root:add(range, "SW-P-08 NAK") end
 
 function p_swp08.dissector(tvb, pinfo, root_tree)
 
@@ -230,7 +235,7 @@ function lookForPacket(tvb, root_tree, startpos)
         elseif (bytes:get_index(p) == DLE) and (p + 1 < len) and
             (bytes:get_index(p + 1) == STX) then
             start = p
-            --            print("Found start ", start)
+            -- print("Found start ", start)
             p = p + 2
             local mess = {}
             while p < len do
@@ -249,6 +254,7 @@ function lookForPacket(tvb, root_tree, startpos)
                             processPacket(mess, root_tree, range)
                             return start, p - start
                         else
+                            root_tree:add_proto_expert_info(ef_bad_dle)
                             print("Bad DLE, Returning ", p)
                             return start, p
                         end
@@ -259,8 +265,7 @@ function lookForPacket(tvb, root_tree, startpos)
         p = p + 1
     end
 
-    --   print("Couldn't find start ", start)
-    return p
+    return p  -- packet is segmented or no start found.
 end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")
