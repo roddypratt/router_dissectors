@@ -7,7 +7,6 @@ local CROSSPOINT_INTERROGATE = 1
 local CROSSPOINT_CONNECT = 2
 local CROSSPOINT_TALLY = 3
 local CROSSPOINT_CONNECTED = 4
-
 local PROTECT_INTERROGATE = 10
 local PROTECT_TALLY = 11
 local PROTECT_CONNECT = 12
@@ -31,18 +30,74 @@ local EXT_PROTECT_DISCONNECT = PROTECT_DISCONNECT + 0x80;
 local EXT_PROTECT_DISCONNECTED = PROTECT_DISCONNECTED + 0x80;
 
 local codes = {
+    [0] = "COMMAND_ENABLE",
     [CROSSPOINT_INTERROGATE] = "CROSSPOINT_INTERROGATE",
     [CROSSPOINT_CONNECT] = "CROSSPOINT_CONNECT",
     [CROSSPOINT_TALLY] = "CROSSPOINT_TALLY",
     [CROSSPOINT_CONNECTED] = "CROSSPOINT_CONNECTED",
+    [7] = "MAINTENANCE",
+    [8] = "DUAL_CONTROLLER_STATUS",
+    [9] = "DUAL_CONTROLLER_STATUS_RESPONSE",
     [PROTECT_INTERROGATE] = "PROTECT_INTERROGATE",
     [PROTECT_TALLY] = "PROTECT_TALLY",
     [PROTECT_CONNECT] = "PROTECT_CONNECT",
     [PROTECT_CONNECTED] = "PROTECT_CONNECTED",
     [PROTECT_DISCONNECT] = "PROTECT_DISCONNECT",
     [PROTECT_DISCONNECTED] = "PROTECT_DISCONNECTED",
+    [17] = "PROTECT_DEVICE_NAME_REQUEST",
+    [18] = "PROTECT_DEVICE_NAME_RESONSE",
+    [19] = "PROTECT_TALLY_DUMP_REQUEST",
+    [20] = "PROTECT_TALLY_DUMP_RESPONSE",
+    [21] = "CROSSPOINT_TALLY_DUMP_REQUEST",
+    [22] = "CROSSPOINT_TALLY_DUMP_RESPONSE",
+    [23] = "EXT_CROSSPOINT_TALLY_DUMP_RESPONSE",
+
+    [25] = "ROUTER_IO_PARAMETERS_INTERROGATE",
+    [26] = "ROUTER_IO_PARAMETERS_TALLY",
+    [27] = "ROUTER_IO_PARAMETERS_CONNECT",
+    [28] = "ROUTER_IO_PARAMETERS_CONNECTED",
+    [29] = "MASTER_PROTECT_CONNECT",
+    [30] = "NAMES_UPDATED",
+
+    [41] = "DIAGNOSTIC",
+    [43] = "DIAGNOSTIC_RESPONSE",
+    [44] = "LOG_MESSAGE",
+
+    [76] = "STATUS_CONFIGURATION",
+    [77] = "STATUS_CONFIGURATION_TALLY",
+    [78] = "LOGGING_STRINGS",
+    [79] = "ERROR_STATUS_REQUEST",
+
+    [87] = "SOFT_KEY_TALLY_REQUEST",
+    [88] = "SOFT_KEY_TALLY_RESPONSE",
+    [89] = "SOFT_KEY_ASSIGNEMENT_SET_REQUEST",
+    [90] = "SOFT_KEY_ASSIGNEMENT_SET_RESPONSE",
+
     [ALL_SOURCE_NAMES] = "ALL_SOURCE_NAMES",
+    [101] = "SINGLE_SOURCE_NAME",
     [ALL_DESTINATION_NAMES] = "ALL_DESTINATION_NAMES",
+    [103] = "SINGLE_DESTINATION_NAME",
+    [104] = "ALL_UMD_LABELS",
+    [105] = "SINGLE_UMD_LABEL",
+    [106] = "SOURCE_NAMES_RESONSE",
+    [107] = "DESINTATION_NAMES_RESPONSE",
+    [108] = "UMD_LABELS_RESPONSE",
+
+    [114] = "ALL_SOURCE_ASSOCIATION_NAMES",
+    [115] = "SINGLE_SOURCE_ASSOCIATION_NAMES",
+    [116] = "SOURCE_ASSOCIATION_NAMES_RESPONSE",
+    [117] = "UPDATE_NAME",
+
+    [111] = "CROSSPOINT_TIE_LINE_CONNECT",
+    [112] = "CROSSPOINT_TIE_LINE_INTERROGATE",
+    [113] = "CROSSPOINT_TIE_LINE_TALLY",
+
+    [120] = "CROSSPOINT_CONNECT_ON_GO_GROUP_SALVO",
+    [121] = "CROSSPOINT_GO_GROUP_SALVO",
+    [122] = "CROSSPOINT_CONNECT_ON_GO_GROUP_SALVO_ACK",
+    [123] = "CROSSPOINT_GO_DONE_GROUP_SALVO",
+    [124] = "CROSSPOINT_SALVO_GROUP_INTERROGATE",
+    [125] = "CROSSPOINT_GROUP_SALVO_TALLY",
 
     [EXT_CROSSPOINT_INTERROGATE] = "EXT_CROSSPOINT_INTERROGATE",
     [EXT_CROSSPOINT_CONNECT] = "EXT_CROSSPOINT_CONNECT",
@@ -53,7 +108,11 @@ local codes = {
     [EXT_PROTECT_CONNECT] = "EXT_PROTECT_CONNECT",
     [EXT_PROTECT_CONNECTED] = "EXT_PROTECT_CONNECTED",
     [EXT_PROTECT_DISCONNECT] = "EXT_PROTECT_DISCONNECT",
-    [EXT_PROTECT_DISCONNECTED] = "EXT_PROTECT_DISCONNECTED"
+    [EXT_PROTECT_DISCONNECTED] = "EXT_PROTECT_DISCONNECTED",
+
+    [0x1006] = "ACK",
+    [0x1015] = "NAK"
+
 }
 
 local protcodes = {
@@ -66,7 +125,7 @@ local protcodes = {
 local namelengths = {[0] = "4 char", [1] = "8 char", [2] = "12 char"}
 
 local p_swp08 = Proto("swp08", "Pro-Bel SW-P-08 protocol");
-local f_opcode = ProtoField.uint8("swp.op", "OpCode", base.HEX, codes);
+local f_opcode = ProtoField.uint16("swp.op", "OpCode", base.HEX, codes);
 local f_matrix4 = ProtoField.uint8("swp.matrix", "Matrix", base.HEX, nil, 0xF0);
 local f_matrix8 = ProtoField.uint8("swp.matrix", "Matrix");
 
@@ -96,8 +155,7 @@ local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
                                         expert.group.MALFORMED,
                                         expert.severity.ERROR);
 local ef_bad_dle = ProtoExpert.new("swp.baddle.expert", "Bad DLE sequence",
-                                        expert.group.MALFORMED,
-                                        expert.severity.ERROR);
+                                   expert.group.MALFORMED, expert.severity.ERROR);
 
 p_swp08.experts = {ef_bad_length, ef_bad_checksum, ef_bad_dle}
 
@@ -197,8 +255,8 @@ function processPacket(mess, root, range)
     tree:add(f_checksum, rangeByte(range, mess, #mess))
 end
 
-function processACK(root, range) root:add(range, "SW-P-08 ACK") end
-function processNAK(root, range) root:add(range, "SW-P-08 NAK") end
+function processACK(root, range) root:add(f_opcode, range) end
+function processNAK(root, range) root:add(f_opcode, range) end
 
 function p_swp08.dissector(tvb, pinfo, root_tree)
 
@@ -265,7 +323,7 @@ function lookForPacket(tvb, root_tree, startpos)
         p = p + 1
     end
 
-    return p  -- packet is segmented or no start found.
+    return p -- packet is segmented or no start found.
 end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")
