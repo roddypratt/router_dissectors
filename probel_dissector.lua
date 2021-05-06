@@ -16,6 +16,8 @@ local PROTECT_DISCONNECTED = 15
 
 local ALL_SOURCE_NAMES = 100
 local ALL_DESTINATION_NAMES = 102
+local SOURCE_NAMES_RESPONSE = 106
+local DESTINATION_NAMES_RESPONSE = 107
 
 local EXT_CROSSPOINT_INTERROGATE = CROSSPOINT_INTERROGATE + 0x80;
 local EXT_CROSSPOINT_CONNECT = CROSSPOINT_CONNECT + 0x80;
@@ -79,8 +81,8 @@ local codes = {
     [103] = "SINGLE_DESTINATION_NAME",
     [104] = "ALL_UMD_LABELS",
     [105] = "SINGLE_UMD_LABEL",
-    [106] = "SOURCE_NAMES_RESONSE",
-    [107] = "DESINTATION_NAMES_RESPONSE",
+    [SOURCE_NAMES_RESPONSE] = "SOURCE_NAMES_RESONSE",
+    [DESTINATION_NAMES_RESPONSE] = "DESINTATION_NAMES_RESPONSE",
     [108] = "UMD_LABELS_RESPONSE",
 
     [114] = "ALL_SOURCE_ASSOCIATION_NAMES",
@@ -132,11 +134,16 @@ local f_matrix8 = ProtoField.uint8("swp.matrix", "Matrix");
 local f_level4 = ProtoField.uint8("swp.level", "Level", base.HEX, nil, 0xF);
 local f_level8 = ProtoField.uint8("swp.level", "Level");
 
+local f_name = ProtoField.string("swp.name", "Name");
+
 local f_source16 = ProtoField.uint16("swp.source", "Source");
 local f_dest16 = ProtoField.uint16("swp.dest", "Dest");
+local f_start = ProtoField.uint16("swp.start", "Start");
 local f_device = ProtoField.uint16("swp.device", "Device");
 local f_checksum = ProtoField.uint8("swp.checksum", "Checksum");
 local f_length = ProtoField.uint8("swp.length", "Length");
+local f_count = ProtoField.uint8("swp.count", "Count");
+
 local f_namelength = ProtoField.uint8("swp.namelength", "NameLength", base.HEX,
                                       namelengths);
 local f_protect =
@@ -144,7 +151,8 @@ local f_protect =
 
 p_swp08.fields = {
     f_opcode, f_matrix8, f_level8, f_source16, f_dest16, f_device, f_checksum,
-    f_protect, f_length, f_namelength, f_level4, f_matrix4
+    f_protect, f_length, f_namelength, f_level4, f_matrix4, f_start, f_name,
+    f_count
 };
 
 local ef_bad_length = ProtoExpert.new("swp.length.expert", "Bad length",
@@ -177,6 +185,12 @@ function rangeByte(range, mess, i) return range:range(dLen(mess, i, 1)), mess[i]
 function rangeWord(range, mess, i)
     return range:range(dLen(mess, i, 2)), mess[i] * 256 + mess[i + 1]
 end
+
+function rangeString(range, mess, i, len)
+    local r = range:range(dLen(mess, i, len))
+    return r, "\"" .. r:string() .. "\""
+end
+
 function rangeDest12(range, mess, i)
     return range:range(dLen(mess, i, 2)), bit32.lshift(
                bit32.band(0x7, bit32.rshift(mess[i], 4)), 7) + mess[i + 1]
@@ -234,8 +248,18 @@ function processPacket(mess, root, range)
         tree:add(f_protect, rangeByte(range, mess, 4))
         tree:add(f_dest16, rangeWord(range, mess, 5))
         tree:add(f_device, rangeWord(range, mess, 7))
-    elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
+    elseif op == SOURCE_NAMES_RESPONSE or op == DESTINATION_NAMES_RESPONSE then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_namelength, rangeByte(range, mess, 3))
+        tree:add(f_start, rangeWord(range, mess, 4))
+        tree:add(f_count, rangeByte(range, mess, 6))
+        local count = mess[6]
+        local l = (mess[3] + 1) * 4
+        for i = 0, count - 1 do
+            tree:add(f_name, rangeString(range, mess, 7 + (i * l), l))
+        end
+    elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
     end
 
@@ -328,4 +352,5 @@ end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")
 tcp_encap_table:add(2007, p_swp08)
+tcp_encap_table:add(2008, p_swp08)
 
