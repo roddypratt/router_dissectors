@@ -19,4 +19,4 @@ If your router is using a different TCP port you can use wireshark's "Decode As.
 
 Packet contents for the all common routing commands are decoded.
 
-![Wireshark Screenshot](https://github.com/roddypratt/router_dissectors/screenshot.png)
+![Wireshark Screenshot](screenshot.png)
