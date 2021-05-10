@@ -2,7 +2,6 @@
 --
 -- Copyright (C) 2021 Rascular Technology Ltd.
 --------------------------------------------------------------
--- widget hints for all parameter types
 local CROSSPOINT_INTERROGATE = 1
 local CROSSPOINT_CONNECT = 2
 local CROSSPOINT_TALLY = 3
