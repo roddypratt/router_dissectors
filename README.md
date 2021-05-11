@@ -3,7 +3,7 @@
 | Protocol        | Filename                     | Default port | Wireshark proto |
 | --------        | --------                     | ------------ | --------------- |
 | Pro-Bel SW-P-08 | `probel_swp08_dissector.lua` | 2007, 2008   | SWP08           |
-| Pro-Bel SW-P-02 | `probel_swp02_dissector.lua` | 2007, 2008   | SWP02           |
+| Pro-Bel SW-P-02 | `probel_swp02_dissector.lua` | 2006         | SWP02           |
 
 
 ## Using the Dissectors
