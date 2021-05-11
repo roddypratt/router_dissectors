@@ -4,6 +4,7 @@
 | --------        | --------                     | ------------ | --------------- |
 | Pro-Bel SW-P-08 | `probel_swp08_dissector.lua` | 2007, 2008   | SWP08           |
 | Pro-Bel SW-P-02 | `probel_swp02_dissector.lua` | 2006         | SWP02           |
+| Utah RCP3-A     | `utah_rcp3a_dissector.lua`   | 5001         | RCP3A           |
 
 
 ## Using the Dissectors
@@ -13,6 +14,7 @@ Either copy `xxx_dissector.lua` to your Wireshark plugins folder, or start wires
 
 `& "c:\program files\wireshark\wireshark.exe" -X lua_script:probel_swp08_dissector.lua`
 `& "c:\program files\wireshark\wireshark.exe" -X lua_script:probel_swp02_dissector.lua`
+`& "c:\program files\wireshark\wireshark.exe" -X lua_script:utah_rcp3a_dissector.lua`
 
 
 If your router is using a different TCP port you can use wireshark's "Decode As.." function to specify the port and protocol.
@@ -20,3 +22,4 @@ If your router is using a different TCP port you can use wireshark's "Decode As.
 Packet contents for the all common routing commands are decoded.
 
 ![Wireshark Screenshot](screenshot.png)
+
