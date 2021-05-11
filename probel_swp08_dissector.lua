@@ -13,6 +13,10 @@ local PROTECT_CONNECTED = 13;
 local PROTECT_DISCONNECT = 14
 local PROTECT_DISCONNECTED = 15
 
+local CROSSPOINT_TALLY_DUMP_REQUEST = 21
+local CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE = 22
+local CROSSPOINT_TALLY_DUMP_RESPONSE_WORD = 23
+
 local ALL_SOURCE_NAMES = 100
 local ALL_DESTINATION_NAMES = 102
 local SOURCE_NAMES_RESPONSE = 106
@@ -29,6 +33,10 @@ local EXT_PROTECT_CONNECT = PROTECT_CONNECT + 0x80;
 local EXT_PROTECT_CONNECTED = PROTECT_CONNECTED + 0x80;
 local EXT_PROTECT_DISCONNECT = PROTECT_DISCONNECT + 0x80;
 local EXT_PROTECT_DISCONNECTED = PROTECT_DISCONNECTED + 0x80;
+
+local EXT_CROSSPOINT_TALLY_DUMP_REQUEST = CROSSPOINT_TALLY_DUMP_REQUEST + 0x80
+local EXT_CROSSPOINT_TALLY_DUMP_RESPONSE =
+    CROSSPOINT_TALLY_DUMP_RESPONSE_WORD + 0x80
 
 local codes = {
     [0] = "COMMAND_ENABLE",
@@ -49,9 +57,9 @@ local codes = {
     [18] = "PROTECT_DEVICE_NAME_RESONSE",
     [19] = "PROTECT_TALLY_DUMP_REQUEST",
     [20] = "PROTECT_TALLY_DUMP_RESPONSE",
-    [21] = "CROSSPOINT_TALLY_DUMP_REQUEST",
-    [22] = "CROSSPOINT_TALLY_DUMP_RESPONSE",
-    [23] = "EXT_CROSSPOINT_TALLY_DUMP_RESPONSE",
+    [CROSSPOINT_TALLY_DUMP_REQUEST] = "CROSSPOINT_TALLY_DUMP_REQUEST",
+    [CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE] = "CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE",
+    [CROSSPOINT_TALLY_DUMP_RESPONSE_WORD] = "CROSSPOINT_TALLY_DUMP_RESPONSE_WORD",
 
     [25] = "ROUTER_IO_PARAMETERS_INTERROGATE",
     [26] = "ROUTER_IO_PARAMETERS_TALLY",
@@ -110,6 +118,7 @@ local codes = {
     [EXT_PROTECT_CONNECTED] = "EXT_PROTECT_CONNECTED",
     [EXT_PROTECT_DISCONNECT] = "EXT_PROTECT_DISCONNECT",
     [EXT_PROTECT_DISCONNECTED] = "EXT_PROTECT_DISCONNECTED",
+    [EXT_CROSSPOINT_TALLY_DUMP_RESPONSE] = "EXT_CROSSPOINT_TALLY_DUMP_RESPONSE",
 
     [0x1006] = "ACK",
     [0x1015] = "NAK"
@@ -260,6 +269,39 @@ function processPacket(mess, root, range)
     elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
+    elseif op == CROSSPOINT_TALLY_DUMP_REQUEST then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
+    elseif op == CROSSPOINT_TALLY_DUMP_RESPONSE_WORD then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
+        tree:add(f_count, rangeByte(range, mess, 3))
+        tree:add(f_dest16, rangeWord(range, mess, 4))
+        local count = mess[3]
+        for i = 0, count - 1 do
+            tree:add(f_source16, rangeWord(range, mess, 6 + i * 2))
+        end
+    elseif op == CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
+        tree:add(f_count, rangeByte(range, mess, 3))
+        tree:add(f_dest16, rangeByte(range, mess, 4))
+        local count = mess[3]
+        for i = 0, count - 1 do
+            tree:add(f_source16, rangeByte(range, mess, 5 + i))
+        end
+    elseif op == EXT_CROSSPOINT_TALLY_DUMP_REQUEST then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+    elseif op == EXT_CROSSPOINT_TALLY_DUMP_RESPONSE then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+        tree:add(f_count, rangeByte(range, mess, 4))
+        tree:add(f_dest16, rangeWord(range, mess, 5))
+        local count = mess[3]
+        for i = 0, count - 1 do
+            tree:add(f_source16, rangeWord(range, mess, 7 + i * 2))
+        end
     end
 
     tree:add(f_length, rangeByte(range, mess, #mess - 1))
@@ -287,7 +329,6 @@ function p_swp08.dissector(tvb, pinfo, root_tree)
     local p = 0
     while p < tvb:len() do
         local st, l = lookForPacket(tvb, root_tree, p)
-        --      print("LFP: ", st, l)
         if l then
             p = st + l;
         else
