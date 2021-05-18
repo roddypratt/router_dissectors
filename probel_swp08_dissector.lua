@@ -89,7 +89,7 @@ local codes = {
     [104] = "ALL_UMD_LABELS",
     [105] = "SINGLE_UMD_LABEL",
     [SOURCE_NAMES_RESPONSE] = "SOURCE_NAMES_RESONSE",
-    [DESTINATION_NAMES_RESPONSE] = "DESINTATION_NAMES_RESPONSE",
+    [DESTINATION_NAMES_RESPONSE] = "DESTINATION_NAMES_RESPONSE",
     [108] = "UMD_LABELS_RESPONSE",
 
     [114] = "ALL_SOURCE_ASSOCIATION_NAMES",
@@ -132,7 +132,8 @@ local protcodes = {
     [3] = "OEM Protect"
 }
 
-local namelengths = {[0] = "4 char", [1] = "8 char", [2] = "12 char"}
+local namelengths = {[0] = 4, [1] = 8, [2] = 12, [3] = 16, [4] = 32}
+-- local namelengths = {[0] = "4 char", [1] = "8 char", [2] = "12 char", [3] = "16 char", [4] = "32 char"}
 
 local p_swp08 = Proto("swp08", "Pro-Bel SW-P-08 protocol");
 local f_opcode = ProtoField.uint16("swp.op", "OpCode", base.HEX, codes);
@@ -262,7 +263,9 @@ function processPacket(mess, root, range)
         tree:add(f_start, rangeWord(range, mess, 4))
         tree:add(f_count, rangeByte(range, mess, 6))
         local count = mess[6]
-        local l = (mess[3] + 1) * 4
+
+        local l = namelengths[mess[3]];
+
         for i = 0, count - 1 do
             tree:add(f_name, rangeString(range, mess, 7 + (i * l), l))
         end
