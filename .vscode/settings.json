@@ -1,12 +1,3 @@
 {
-    "Lua.runtime.version": "Lua 5.2",
-    "Lua.diagnostics.globals": [
-        "expert",
-        "ProtoField",
-        "Proto",
-        "ProtoExpert",
-        "DissectorTable",
-        "base",
-        "DESEGMENT_ONE_MORE_SEGMENT"
-    ]
+    "Lua.runtime.version": "Lua 5.2"
 }
