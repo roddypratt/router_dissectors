@@ -122,7 +122,6 @@ local codes = {
 
     [0x1006] = "ACK",
     [0x1015] = "NAK"
-
 }
 
 local protcodes = {
@@ -133,7 +132,6 @@ local protcodes = {
 }
 
 local namelengths = {[0] = 4, [1] = 8, [2] = 12, [3] = 16, [4] = 32}
--- local namelengths = {[0] = "4 char", [1] = "8 char", [2] = "12 char", [3] = "16 char", [4] = "32 char"}
 
 local p_swp08 = Proto("swp08", "Pro-Bel SW-P-08 protocol");
 local f_opcode = ProtoField.uint16("swp.op", "OpCode", base.HEX, codes);
@@ -191,6 +189,7 @@ function dLen(s, start, l)
 end
 
 function rangeByte(range, mess, i) return range:range(dLen(mess, i, 1)), mess[i] end
+
 function rangeWord(range, mess, i)
     return range:range(dLen(mess, i, 2)), mess[i] * 256 + mess[i + 1]
 end
@@ -262,12 +261,11 @@ function processPacket(mess, root, range)
         tree:add(f_namelength, rangeByte(range, mess, 3))
         tree:add(f_start, rangeWord(range, mess, 4))
         tree:add(f_count, rangeByte(range, mess, 6))
-        local count = mess[6]
 
-        local l = namelengths[mess[3]];
+        local len = namelengths[mess[3]];
 
-        for i = 0, count - 1 do
-            tree:add(f_name, rangeString(range, mess, 7 + (i * l), l))
+        for i = 0, mess[6] - 1 do
+            tree:add(f_name, rangeString(range, mess, 7 + (i * len), len))
         end
     elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
@@ -318,8 +316,8 @@ function processPacket(mess, root, range)
 
     if bit32.band(-sum, 0xff) ~= mess[#mess] then
         tree:add_proto_expert_info(ef_bad_checksum)
-
     end
+
     tree:add(f_checksum, rangeByte(range, mess, #mess))
 end
 
