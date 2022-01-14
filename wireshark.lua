@@ -144,3 +144,7 @@ function dissectortable:get_dissector(pattern) end
 ---@return string A string of debug information about the DissectorTable.
 function dissectortable:__tostring() end
 expert = {}
+
+--- Add a directory to the head of the package search path
+--- @param path string directory to add
+function package.prepend_path(path) end

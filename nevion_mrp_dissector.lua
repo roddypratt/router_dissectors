@@ -63,7 +63,6 @@ end
 function lookForPacket(tvb, root_tree, startpos)
     local bytes = tvb:bytes();
     local len = bytes:len()
-    local startFound = false
     local mess = ""
 
     for p = startpos, len - 2 do
