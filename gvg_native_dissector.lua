@@ -1,13 +1,13 @@
--- Nevion MRP Protocol dissector for Wireshark.
+-- Grass Valley Native Protocol dissector for Wireshark.
 --
--- Copyright (C) 2021 Rascular Technology Ltd.
+-- Copyright (C) 2021-2022 Rascular Technology Ltd.
 --------------------------------------------------------------
 local gvg = Proto("GVGNative", "Grass Valley Native protocol");
 
 local f_body = ProtoField.string("GVGNative.body", "Body");
 local f_stx = ProtoField.uint8("GVGNative.STX", "STX");
-local f_native = ProtoField.uint8("GVGNative.Native", "Native");
-local f_sequence = ProtoField.uint8("GVGNative.Sequence", "Sequence");
+local f_native = ProtoField.string("GVGNative.Native", "Native");
+local f_sequence = ProtoField.string("GVGNative.Sequence", "Sequence");
 local f_command = ProtoField.string("GVGNative.Command", "Command");
 local f_params = ProtoField.string("GVGNative.Params", "Params");
 local f_param = ProtoField.string("GVGNative.Param", "Param");
@@ -51,7 +51,7 @@ local commands = { AS = "Machine Assign",
     Qd = "Query Destination status",
     QE = "Query Error Definition",
     QH = "Query Alarm Status",
-    QI = "Query Destination by index",
+    QI = "Query Destination by Index",
     Qi = "Query Destination by index",
     QJ = "Query Destination by index",
     Qj = "Query Destination by index",
@@ -78,7 +78,15 @@ bk_commands = {
     N = "Get Device Name",
     R = "Get Software Revision",
     T = "Get software Title",
-    d = "Get Port Name"
+    t = "Get Protcol",
+    F = "Ger reset occurences",
+    f = "Mask clear change flags",
+    d = "Get Port Name",
+    D = "Clear QD Flags",
+    A = "Clear QA Flags",
+    P = "Get port configuration parameters",
+    E = "Get/Set Level 4 Echo",
+    ["2"] = "Null Command"
 }
 
 error_codes = {
@@ -147,7 +155,8 @@ error_codes = {
     [196] = "Bad Number of Entries",
     [197] = "Not Supported",
     [198] = "SNMP Disabled",
-    [199] = "Not Supported in WIN32" }
+    [199] = "Not Supported in WIN32"
+}
 
 
 function rangeByte(range, i)
@@ -160,6 +169,11 @@ function rangeString(range, i, len)
     return r, r:string()
 end
 
+function rangeChar(range, i)
+    local r = range:range(i, 1)
+    return r, r:string()
+end
+
 function processPacket(mess, root, range)
     local tree = root:add(range, "GVG Native")
 
@@ -169,26 +183,26 @@ function processPacket(mess, root, range)
     end
 
     tree:add(f_stx, rangeByte(range, 0))
-    local f, s = rangeByte(range, 1)
+    local f, s = rangeChar(range, 1)
     tree:add(f_native, f, s)
-    if s ~= 78 then
+    if s ~= "N" then
         tree:add_proto_expert_info(ef_bad_protocol)
     end
-    tree:add(f_sequence, rangeByte(range, 2))
+    tree:add(f_sequence, rangeChar(range, 2))
 
     f, s = rangeString(range, 3, 2)
     local item = tree:add(f_command, f, s)
 
     local params = {}
 
-    local r, paramstr = rangeString(range, 5, #mess - 7)
+    local r, paramstr = rangeString(range, 6, #mess - 8)
     for token in string.gmatch(paramstr, "[^\t]+") do
         params[#params + 1] = token
     end
 
     if s == "BK" then
-        if bk_commands[ params[1] ] then
-            item:append_text(": " .. bk_commands[ params[1] ])
+        if bk_commands[params[1]] then
+            item:append_text(": " .. bk_commands[params[1]])
         else
             item:append_text(": ", params[1])
         end
@@ -212,8 +226,6 @@ function processPacket(mess, root, range)
     for i = 2, #mess - 2 do sum = sum + mess[i] end
 
     f, s = rangeString(range, #mess - 2, 2)
-
-    print(sum, " ", s)
 
     tree:add(f_checksum, f, s)
 
