@@ -85,7 +85,7 @@ local codes = {
     [DEVICE_TABLE_REPLY] = "DEVICE_TABLE_REPLY"
 }
 
-local r_rcp3a = Proto("swp02", "Utah rcp3a protocol");
+local r_rcp3a = Proto("rcp3a", "Utah rcp3a protocol");
 
 local f_opcode = ProtoField.uint16("rcp3a.op", "OpCode", base.HEX, codes);
 local f_nametype = ProtoField.uint8("rcp3a.nametype", "Name Type", base.HEX,
