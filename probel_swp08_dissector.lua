@@ -13,6 +13,9 @@ local PROTECT_CONNECTED = 13;
 local PROTECT_DISCONNECT = 14
 local PROTECT_DISCONNECTED = 15
 
+local PROTECT_TALLY_DUMP_REQUEST = 19
+local PROTECT_TALLY_DUMP_RESPONSE = 20
+
 local CROSSPOINT_TALLY_DUMP_REQUEST = 21
 local CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE = 22
 local CROSSPOINT_TALLY_DUMP_RESPONSE_WORD = 23
@@ -55,8 +58,8 @@ local codes = {
     [PROTECT_DISCONNECTED] = "PROTECT_DISCONNECTED",
     [17] = "PROTECT_DEVICE_NAME_REQUEST",
     [18] = "PROTECT_DEVICE_NAME_RESONSE",
-    [19] = "PROTECT_TALLY_DUMP_REQUEST",
-    [20] = "PROTECT_TALLY_DUMP_RESPONSE",
+    [PROTECT_TALLY_DUMP_REQUEST] = "PROTECT_TALLY_DUMP_REQUEST",
+    [PROTECT_TALLY_DUMP_RESPONSE] = "PROTECT_TALLY_DUMP_RESPONSE",
     [CROSSPOINT_TALLY_DUMP_REQUEST] = "CROSSPOINT_TALLY_DUMP_REQUEST",
     [CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE] = "CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE",
     [CROSSPOINT_TALLY_DUMP_RESPONSE_WORD] = "CROSSPOINT_TALLY_DUMP_RESPONSE_WORD",
@@ -118,6 +121,7 @@ local codes = {
     [EXT_PROTECT_CONNECTED] = "EXT_PROTECT_CONNECTED",
     [EXT_PROTECT_DISCONNECT] = "EXT_PROTECT_DISCONNECT",
     [EXT_PROTECT_DISCONNECTED] = "EXT_PROTECT_DISCONNECTED",
+    [EXT_CROSSPOINT_TALLY_DUMP_REQUEST] = "EXT_CROSSPOINT_TALLY_DUMP_REQUEST",
     [EXT_CROSSPOINT_TALLY_DUMP_RESPONSE] = "EXT_CROSSPOINT_TALLY_DUMP_RESPONSE",
 
     [0x1006] = "ACK",
@@ -131,7 +135,8 @@ local protcodes = {
     [3] = "OEM Protect"
 }
 
-local namelengths = {[0] = 4, [1] = 8, [2] = 12, [3] = 16, [4] = 32}
+
+local namelengths = { [0] = 4, [1] = 8, [2] = 12, [3] = 16, [4] = 32 }
 
 local p_swp08 = Proto("swp08", "Pro-Bel SW-P-08 protocol");
 local f_opcode = ProtoField.uint16("swp.op", "OpCode", base.HEX, codes);
@@ -144,6 +149,7 @@ local f_level8 = ProtoField.uint8("swp.level", "Level");
 local f_name = ProtoField.string("swp.name", "Name");
 
 local f_source16 = ProtoField.uint16("swp.source", "Source");
+
 local f_dest16 = ProtoField.uint16("swp.dest", "Dest");
 local f_start = ProtoField.uint16("swp.start", "Start");
 local f_device = ProtoField.uint16("swp.device", "Device");
@@ -152,7 +158,7 @@ local f_length = ProtoField.uint8("swp.length", "Length");
 local f_count = ProtoField.uint8("swp.count", "Count");
 
 local f_namelength = ProtoField.uint8("swp.namelength", "NameLength", base.HEX,
-                                      namelengths);
+    namelengths);
 local f_protect =
     ProtoField.uint8("swp.protect", "Protect", base.HEX, protcodes);
 
@@ -163,16 +169,16 @@ p_swp08.fields = {
 };
 
 local ef_bad_length = ProtoExpert.new("swp.length.expert", "Bad length",
-                                      expert.group.MALFORMED,
-                                      expert.severity.ERROR);
+    expert.group.MALFORMED,
+    expert.severity.ERROR);
 
 local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
-                                        expert.group.MALFORMED,
-                                        expert.severity.ERROR);
+    expert.group.MALFORMED,
+    expert.severity.ERROR);
 local ef_bad_dle = ProtoExpert.new("swp.baddle.expert", "Bad DLE sequence",
-                                   expert.group.MALFORMED, expert.severity.ERROR);
+    expert.group.MALFORMED, expert.severity.ERROR);
 
-p_swp08.experts = {ef_bad_length, ef_bad_checksum, ef_bad_dle}
+p_swp08.experts = { ef_bad_length, ef_bad_checksum, ef_bad_dle }
 
 local DLE = 0x10
 local STX = 2
@@ -201,11 +207,12 @@ end
 
 function rangeDest12(range, mess, i)
     return range:range(dLen(mess, i, 2)), bit32.lshift(
-               bit32.band(0x7, bit32.rshift(mess[i], 4)), 7) + mess[i + 1]
+        bit32.band(0x7, bit32.rshift(mess[i], 4)), 7) + mess[i + 1]
 end
+
 function rangeSrc12(range, mess, i)
     return range:range(dLen(mess, i, 3)),
-           bit32.lshift(bit32.band(mess[i], 0xf), 7) + mess[i + 2]
+        bit32.lshift(bit32.band(mess[i], 0xf), 7) + mess[i + 2]
 end
 
 function processPacket(mess, root, range)
@@ -238,6 +245,7 @@ function processPacket(mess, root, range)
         tree:add(f_level4, rangeByte(range, mess, 2))
         tree:add(f_protect, rangeByte(range, mess, 3))
         tree:add(f_dest16, rangeDest12(range, mess, 4))
+        tree:add(f_device, rangeSrc12(range, mess, 4))
     elseif op == EXT_CROSSPOINT_CONNECT or op == EXT_CROSSPOINT_CONNECTED or op ==
         EXT_CROSSPOINT_TALLY then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
@@ -270,6 +278,18 @@ function processPacket(mess, root, range)
     elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
+    elseif op == PROTECT_TALLY_DUMP_REQUEST then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
+        tree:add(f_dest16, rangeWord(range, mess, 3))
+    elseif op == PROTECT_TALLY_DUMP_RESPONSE then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
+        tree:add(f_dest16, rangeWord(range, mess, 3))
+        for i = 0, 16 do
+            local r, v = rangeByte(range, mess, 4 + 2 * i)
+            tree:add(f_protect, r, bit32.rshift(v, 4))
+        end
     elseif op == CROSSPOINT_TALLY_DUMP_REQUEST then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_level4, rangeByte(range, mess, 2))
@@ -322,10 +342,10 @@ function processPacket(mess, root, range)
 end
 
 function processACK(root, range) root:add(f_opcode, range) end
+
 function processNAK(root, range) root:add(f_opcode, range) end
 
 function p_swp08.dissector(tvb, pinfo, root_tree)
-
     pinfo.cols.protocol = "SW-P-08";
     local p = 0
     while p < tvb:len() do
@@ -394,4 +414,3 @@ end
 local tcp_encap_table = DissectorTable.get("tcp.port")
 tcp_encap_table:add(2007, p_swp08)
 tcp_encap_table:add(2008, p_swp08)
-
