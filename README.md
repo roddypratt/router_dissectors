@@ -15,7 +15,6 @@
 
 Either copy `xxx_dissector.lua` to your Wireshark plugins folder, or start wireshark (e.g. from Powershell) like this:
 
-
 `& "c:\program files\wireshark\wireshark.exe" -X lua_script:harris_lrc_dissector.lua`
 
 `& "c:\program files\wireshark\wireshark.exe" -X lua_script:nevion_mrp_dissector.lua`
@@ -32,10 +31,8 @@ Either copy `xxx_dissector.lua` to your Wireshark plugins folder, or start wires
 
 `& "c:\program files\wireshark\wireshark.exe" -X lua_script:np0017_dissector.lua`
 
-
 If your router is using a different TCP port you can use wireshark's "Decode As.." function to specify the port and protocol.
 
 Packet contents for the all common routing commands are decoded.
 
 ![Wireshark Screenshot](screenshot.png)
-

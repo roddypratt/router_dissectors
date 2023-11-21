@@ -31,9 +31,9 @@ ProtoField = {}
 ProtoExpert = {}
 
 --- @class base
-base = {NONE = 1, DEC = 2, HEX = 3, OCT = 4, DEC_HEX = 5, HEX_DEC = 6}
+base = { NONE = 1, DEC = 2, HEX = 3, OCT = 4, DEC_HEX = 5, HEX_DEC = 6 }
 
-ftypes = {UINT8 = 1, UINT16 = 2, UINT24 = 3, UINT32 = 4, STRING = 5}
+ftypes = { UINT8 = 1, UINT16 = 2, UINT24 = 3, UINT32 = 4, STRING = 5 }
 
 --- @class Tvb
 Tvb = {}
@@ -76,7 +76,7 @@ function dissector:__call(tvb, pinfo, tree) end
 ---@return string @A string of the protocol’s short name.
 function dissector:__tostring() end
 
---- A table of subdissectors of a particular protocol 
+--- A table of subdissectors of a particular protocol
 DissectorTable = {}
 
 ---Creates a new DissectorTable for your dissector’s use.
@@ -116,7 +116,6 @@ function dissectortable:add(pattern, dissector) end
 --- Clear all existing dissectors from a table and add a new dissector or a range of new dissectors.
 --- @param pattern number|string The pattern to match (either an integer, a integer range or a string depending on the table’s type)
 --- @param dissector Proto|dissector The dissector to add (either a Proto or a Dissector)
-
 function dissectortable:set(pattern, dissector) end
 
 --- Remove a dissector or a range of dissectors from a table.
@@ -143,6 +142,7 @@ function dissectortable:get_dissector(pattern) end
 ---Gets some debug information about the DissectorTable.
 ---@return string A string of debug information about the DissectorTable.
 function dissectortable:__tostring() end
+
 expert = {}
 
 --- Add a directory to the head of the package search path

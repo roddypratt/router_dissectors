@@ -85,11 +85,11 @@ local codes = {
     [DEVICE_TABLE_REPLY] = "DEVICE_TABLE_REPLY"
 }
 
-local r_rcp3a = Proto("rcp3a", "Utah rcp3a protocol");
+local r_rcp3a = Proto("rcp3a", "Utah RCP-3A protocol");
 
 local f_opcode = ProtoField.uint16("rcp3a.op", "OpCode", base.HEX, codes);
 local f_nametype = ProtoField.uint8("rcp3a.nametype", "Name Type", base.HEX,
-                                    {[0] = "Sources", [1] = "Destinations"});
+    { [0] = "Sources", [1] = "Destinations" });
 
 local f_name = ProtoField.string("rcp3a.name", "Name");
 
@@ -123,19 +123,21 @@ r_rcp3a.fields = {
 };
 
 local ef_bad_checksum = ProtoExpert.new("rcp3a.checksum.expert", "Bad checksum",
-                                        expert.group.MALFORMED,
-                                        expert.severity.ERROR);
+    expert.group.MALFORMED,
+    expert.severity.ERROR);
 
-r_rcp3a.experts = {ef_bad_checksum}
+r_rcp3a.experts = { ef_bad_checksum }
 
 function rangeByte(range, i)
     local r = range:range(i, 1)
     return r, r:uint()
 end
+
 function rangeWord(range, i)
     local r = range:range(i, 2)
     return r, r:uint()
 end
+
 function rangeLong(range, i)
     local r = range:range(i, 4)
     return r, r:uint()
@@ -203,7 +205,6 @@ function processPacket(root, range)
 end
 
 function r_rcp3a.dissector(tvb, pinfo, root_tree)
-
     pinfo.cols.protocol = "RCP-3A";
     local p = 0
     while p < tvb:len() do
@@ -226,7 +227,7 @@ function lookForPacket(tvb, root_tree, startpos)
     if startpos > (len - 6) then return startpos end
 
     local pktlen = bytes:get_index(startpos + 4) * 256 +
-                       bytes:get_index(startpos + 5)
+        bytes:get_index(startpos + 5)
 
     if startpos > (len - (6 + pktlen)) then return startpos end
 
@@ -237,4 +238,3 @@ end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")
 tcp_encap_table:add(5001, r_rcp3a)
-
