@@ -74,23 +74,34 @@ local mnemonictype = {
     [7] = "Destination Categories"
 }
 
+local changetype = {
+    [0] = "Crosspoint change",
+    [1] = "Output Locked",
+    [2] = "Output Protected",
+    [3] = "Output Released",
+    [4] = "Input Locked",
+    [5] = "Input Protected",
+    [6] = "Input Released"
+}
+
 local f_command = ProtoField.uint32("np0017.command", "Command", base.HEX, commands);
-local f_length = ProtoField.uint32("np0017.length", "Length");
+local f_length = ProtoField.int32("np0017.length", "Length");
 local f_sequence = ProtoField.uint32("np0017.sequence", "Sequence");
 local f_cmdreply = ProtoField.uint32("np0017.cmdreply", "Cmd/Reply", base.HEX,
     { [0] = "Command", [0x80000000] = "Reply" });
 local f_protocol = ProtoField.uint32("np0017.protocol", "Protocol", base.HEX);
-local f_input = ProtoField.uint32("np0017.input", "Input");
-local f_level = ProtoField.uint32("np0017.level", "Level");
-local f_output = ProtoField.uint32("np0017.output", "Output");
-local f_userid = ProtoField.uint32("np0017.userid", "User ID");
-local f_numentries = ProtoField.uint32("np0017.entries", "Entries");
+local f_input = ProtoField.int32("np0017.input", "Input");
+local f_level = ProtoField.int32("np0017.level", "Level");
+local f_output = ProtoField.int32("np0017.output", "Output");
+local f_userid = ProtoField.int32("np0017.userid", "User ID");
+local f_numentries = ProtoField.int32("np0017.entries", "Entries");
 local f_lockop = ProtoField.uint32("np0017.lockop", "Lock Operation", base.HEX, lockops);
 local f_mnemonic = ProtoField.string("np0017.mnemonic", "Mnemonic");
+local f_changetype = ProtoField.uint32("np0017.changetype", "Change Type", base.HEX, changetype);
 
 local f_mnemonictype = ProtoField.uint32("np0017.mnemomictype", "Mnemonic Type", base.HEX, mnemonictype);
 np0017.fields = { f_command, f_length, f_sequence, f_protocol, f_cmdreply, f_input, f_output, f_level, f_userid,
-    f_numentries, f_lockop, f_mnemonictype, f_mnemonic };
+    f_numentries, f_lockop, f_mnemonictype, f_mnemonic, f_changetype };
 
 
 local ef_malformed = ProtoExpert.new("np0017.malformed.expert", "Malformed packet",
@@ -204,6 +215,52 @@ function add_getextmnemonics_reply(tree, range)
     end
 end
 
+function add_portchanged(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 24), "Entry " .. i)
+        sub:add(f_changetype, rangeLong(range, base))
+
+        sub:add(f_level, rangeLong(range, base + 4))
+        sub:add(f_output, rangeLong(range, base + 8))
+        sub:add(f_input, rangeLong(range, base + 12))
+        sub:add(f_userid, rangeLong(range, base + 16))
+
+        base = base + 24
+    end
+end
+
+function add_portstatus(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 8), "Entry " .. i)
+        sub:add(f_level, rangeLong(range, base))
+        sub:add(f_output, rangeLong(range, base + 4))
+        base = base + 8
+    end
+end
+
+function add_portstatusreply(tree, range)
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 8), "Entry " .. i)
+        sub:add(f_level, rangeLong(range, base))
+        sub:add(f_output, rangeLong(range, base + 4))
+        sub:add(f_input, rangeLong(range, base + 8))
+
+        base = base + 16
+    end
+end
+
 function processPacket(root, range)
     local tree = root:add(range, "NP0017")
 
@@ -224,6 +281,12 @@ function processPacket(root, range)
         add_getextmnemonics(tree, range)
     elseif (c == GETEXTMNEMONICSPORT + 0x80000000) then
         add_getextmnemonics_reply(tree, range)
+    elseif c == STATUSCHANGEDPORT then
+        add_portchanged(tree, range)
+    elseif c == GETSTATUSPORT then
+        add_portstatus(tree, range)
+    elseif c == GETSTATUSPORT + 0x80000000 then
+        add_portstatusreply(tree, range)
     end
 end
 
