@@ -84,16 +84,39 @@ local changetype = {
     [6] = "Input Released"
 }
 
+local charset = { [0] = "ASCII", [1] = "UCS-16" }
+
 local f_command = ProtoField.uint32("np0017.command", "Command", base.HEX, commands);
+local f_charset = ProtoField.uint32("np0017.charset", "Char Set", base.HEX, charset);
 local f_length = ProtoField.int32("np0017.length", "Length");
 local f_sequence = ProtoField.uint32("np0017.sequence", "Sequence");
+local f_osequence = ProtoField.uint32("np0017.osequence", "Originating Sequence");
 local f_cmdreply = ProtoField.uint32("np0017.cmdreply", "Cmd/Reply", base.HEX,
     { [0] = "Command", [0x80000000] = "Reply" });
 local f_protocol = ProtoField.uint32("np0017.protocol", "Protocol", base.HEX);
 local f_input = ProtoField.int32("np0017.input", "Input");
+local f_offset = ProtoField.int32("np0017.offset", "Offset");
 local f_level = ProtoField.int32("np0017.level", "Level");
 local f_output = ProtoField.int32("np0017.output", "Output");
 local f_userid = ProtoField.int32("np0017.userid", "User ID");
+local f_status = ProtoField.uint32("np0017.status", "Status", base.HEX,
+    {
+        [0] = "Success",
+        [1] = "Invalid Data",
+        [2] = "Unknown Error",
+        [3] = "Invalid Source",
+        [4] = "Invalid Dest",
+        [5] = "Invalid Level"
+    });
+local f_operationflag = ProtoField.uint32("np0017.opflag", "Operation", base.HEX,
+    {
+        [0] = "Crosspoint",
+        [1] = "Output Lock",
+        [2] = "Input Lock",
+        [3] = "Input Crosspoint",
+        [4] = "Drop input",
+        [5] = "Drop output"
+    });
 local f_numentries = ProtoField.int32("np0017.entries", "Entries");
 local f_lockop = ProtoField.uint32("np0017.lockop", "Lock Operation", base.HEX, lockops);
 local f_mnemonic = ProtoField.string("np0017.mnemonic", "Mnemonic");
@@ -101,14 +124,19 @@ local f_changetype = ProtoField.uint32("np0017.changetype", "Change Type", base.
 
 local f_mnemonictype = ProtoField.uint32("np0017.mnemomictype", "Mnemonic Type", base.HEX, mnemonictype);
 np0017.fields = { f_command, f_length, f_sequence, f_protocol, f_cmdreply, f_input, f_output, f_level, f_userid,
-    f_numentries, f_lockop, f_mnemonictype, f_mnemonic, f_changetype };
+    f_numentries, f_lockop, f_mnemonictype, f_mnemonic, f_changetype, f_offset, f_charset, f_status, f_operationflag,
+    f_osequence };
 
 
 local ef_malformed = ProtoExpert.new("np0017.malformed.expert", "Malformed packet",
     expert.group.MALFORMED,
     expert.severity.ERROR);
 
-np0017.experts = { ef_malformed }
+local ef_badstatus = ProtoExpert.new("np0017.badstatus.expert", "Bad Status",
+    expert.group.RESPONSE_CODE,
+    expert.severity.WARN);
+
+np0017.experts = { ef_malformed, ef_badstatus }
 
 function rangeLong(rr, i)
     local r = rr:range(i, 4)
@@ -118,6 +146,11 @@ end
 function rangeString(range, i, len)
     local r = range:range(i, len)
     return r, r:string()
+end
+
+function rangeUString(range, i, len)
+    local r = range:range(i, len)
+    return r, r:ustring()
 end
 
 function add_takeport(tree, range)
@@ -132,6 +165,26 @@ function add_takeport(tree, range)
         sub:add(f_input, rangeLong(range, base))
         sub:add(f_level, rangeLong(range, base + 4))
         sub:add(f_output, rangeLong(range, base + 8))
+    end
+end
+
+function add_takeport_reply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    local base = 24
+    for i = 1, n do
+        addStatus(tree, range, base)
+        base = base + 4
+    end
+end
+
+function addStatus(tree, range, base)
+    local f, n = rangeLong(range, base)
+    tree:add(f_status, f, n)
+    if n ~= 0 then
+        tree:add_tvb_expert_info(ef_badstatus, f, "Bad Status")
     end
 end
 
@@ -151,12 +204,12 @@ function add_lockport(tree, range)
 end
 
 function add_dimensions(tree, range)
-    -- tree:add(rangeLong(range, 16))
+    tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
     tree:add(f_numentries, f, n)
 
     for i = 1, n do
-        local base = 24 + (i - 1) * 12
+        local base = 24 + (i - 1) * 24
         local sub = tree:add(range:range(base, 16), "Entry " .. i)
         sub:add(f_level, rangeLong(range, base))
         local r1, r2 = rangeLong(range, base + 4)
@@ -191,7 +244,54 @@ function add_getextmnemonics(tree, range)
     end
 end
 
+function add_getdevmnemonics(tree, range)
+    tree:add(f_mnemonictype, rangeLong(range, 16))
+    tree:add(f_charset, rangeLong(range, 20))
+    tree:add(f_numentries, rangeLong(range, 24))
+    tree:add(f_offset, rangeLong(range, 28))
+end
+
+function add_getdevmnemonics_reply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+    -- assume we're decoding unicode for now
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 24), "Entry " .. i)
+        sub:add(f_input, rangeLong(range, base + 4))
+        sub:add(f_mnemonic, rangeUString(range, base + 8, 16))
+        base = base + 24
+    end
+end
+
+function add_registerport(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 12), "Entry " .. i)
+        sub:add(f_operationflag, rangeLong(range, base))
+        sub:add(f_level, rangeLong(range, base + 4))
+        sub:add(f_output, rangeLong(range, base + 8))
+        base = base + 12
+    end
+end
+
+function add_registerport_reply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 4), "Entry " .. i)
+        addStatus(sub, range, base)
+        base = base + 4
+    end
+end
+
 function add_getextmnemonics_reply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
     tree:add(f_mnemonictype, rangeLong(range, 20))
     local f, n = rangeLong(range, 24)
     tree:add(f_numentries, f, n)
@@ -228,6 +328,7 @@ function add_portchanged(tree, range)
         sub:add(f_output, rangeLong(range, base + 8))
         sub:add(f_input, rangeLong(range, base + 12))
         sub:add(f_userid, rangeLong(range, base + 16))
+        addStatus(sub, range, base + 20)
 
         base = base + 24
     end
@@ -247,6 +348,7 @@ function add_portstatus(tree, range)
 end
 
 function add_portstatusreply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
     tree:add(f_numentries, f, n)
 
@@ -273,10 +375,16 @@ function processPacket(root, range)
 
     if c == TAKEPORT then
         add_takeport(tree, range)
+    elseif c == (TAKEPORT + 0x80000000) then
+        add_takeport_reply(tree, range)
     elseif c == LOCKPORT then
         add_lockport(tree, range)
     elseif c == (GETDIMENSIONS + 0x80000000) then
         add_dimensions(tree, range)
+    elseif c == GETMNEMONICS then
+        add_getdevmnemonics(tree, range)
+    elseif c == (GETMNEMONICS + 0x80000000) then
+        add_getdevmnemonics_reply(tree, range)
     elseif c == GETEXTMNEMONICSPORT then
         add_getextmnemonics(tree, range)
     elseif (c == GETEXTMNEMONICSPORT + 0x80000000) then
@@ -287,6 +395,10 @@ function processPacket(root, range)
         add_portstatus(tree, range)
     elseif c == GETSTATUSPORT + 0x80000000 then
         add_portstatusreply(tree, range)
+    elseif c == REGISTERPORT then
+        add_registerport(tree, range)
+    elseif (c == REGISTERPORT + 0x80000000) then
+        add_registerport_reply(tree, range)
     end
 end
 
