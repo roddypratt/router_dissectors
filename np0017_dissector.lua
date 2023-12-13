@@ -17,15 +17,19 @@ local LOCKSTATUSPORT = 0x3009
 local FIRESALVO = 0x300A
 local STATUSCHANGED = 0x300B
 local STATUSCHANGEDPORT = 0x300C
+local TAKEFREESOURCE = 0x300D
+local GETPREVIOUSSOURCE = 0x3011
 local GETMNEMONICS = 0x3012
 local FINDMNEMONICS = 0x3013
 local GETDIMENSIONS = 0x3014
 local GETMNEMONICSPORT = 0x3015
 local ALLLEVELESTAKE = 0x3016
-
+local GETEXTENDEDDIMENSIONS = 0x301F
+local GETCROSSPOINTSTATUS = 0x3020
 local GETEXTMNEMONICS = 0x3022
 local FINDEXTMNEMONICS = 0x3033
 local GETEXTMNEMONICSPORT = 0x3025
+local ERRORRESPONSE = 0x80000000
 
 local commands = {
     [TAKE] = "TAKE DEVICE",
@@ -41,14 +45,19 @@ local commands = {
     [FIRESALVO] = "FIRE SALVO",
     [STATUSCHANGED] = "DEVICE STATUS CHANGED",
     [STATUSCHANGEDPORT] = "PORT STATUS CHANGED",
+    [TAKEFREESOURCE] = "TAKE FREE SOURCE",
+    [GETPREVIOUSSOURCE] = "GET PREVIOUS SOURCE",
     [GETMNEMONICS] = "GET DEVICE MNEMONICS",
     [FINDMNEMONICS] = "FIND DEVICE MNEMONIC",
     [GETDIMENSIONS] = "GET DIMENSIONS",
     [GETMNEMONICSPORT] = "GET PORT MNEMONICS",
     [ALLLEVELESTAKE] = "DEVICE TAKE - ALL LEVELS",
+    [GETEXTENDEDDIMENSIONS] = "GET EXTENDED DIMENSIONS",
+    [GETCROSSPOINTSTATUS] = "GET CROSSPOINT STATUS",
     [GETEXTMNEMONICS] = "GET EXTENDED DEVICE MNEMONICS",
     [FINDEXTMNEMONICS] = "FIND EXTENDED DEVICE MNEMONICS",
-    [GETEXTMNEMONICSPORT] = "GET EXTENDED PORT MNEMONICS"
+    [GETEXTMNEMONICSPORT] = "GET EXTENDED PORT MNEMONICS",
+    [ERRORRESPONSE] = "ERROR RESPONSE"
 }
 
 
@@ -153,6 +162,11 @@ function rangeUString(range, i, len)
     return r, r:ustring()
 end
 
+function add_int(tree, range, base, name)
+    local r, v = rangeLong(range, base)
+    tree:add(r, name, v)
+end
+
 function add_takeport(tree, range)
     tree:add(f_userid, rangeLong(range, 16))
 
@@ -212,16 +226,11 @@ function add_dimensions(tree, range)
         local base = 24 + (i - 1) * 24
         local sub = tree:add(range:range(base, 16), "Entry " .. i)
         sub:add(f_level, rangeLong(range, base))
-        local r1, r2 = rangeLong(range, base + 4)
-        sub:add(r1, "Level Type:", r2)
-        r1, r2 = rangeLong(range, base + 8)
-        sub:add(r1, "Input Start:", r2)
-        r1, r2 = rangeLong(range, base + 12)
-        sub:add(r1, "Input End:", r2)
-        r1, r2 = rangeLong(range, base + 16)
-        sub:add(r1, "Output Start:", r2)
-        r1, r2 = rangeLong(range, base + 20)
-        sub:add(r1, "Output End:", r2)
+        add_int(sub, range, base + 4, "Level Type")
+        add_int(sub, range, base + 8, "Input Start")
+        add_int(sub, range, base + 12, "Input End")
+        add_int(sub, range, base + 16, "Output Start")
+        add_int(sub, range, base + 20, "Output End")
     end
 end
 
@@ -234,12 +243,11 @@ function add_getextmnemonics(tree, range)
         local base = 24 + (i - 1) * 12
         local sub = tree:add(range:range(base, 12), "Entry " .. i)
         sub:add(f_level, rangeLong(range, base))
-        sub:add(f_input, rangeLong(range, base + 4))
         local r, v = rangeLong(range, base + 8)
         if v == 0 then
-            sub:add(r, "Output port")
+            sub:add(f_output, rangeLong(range, base + 4))
         else
-            sub:add(r, "Input port")
+            sub:add(f_input, rangeLong(range, base + 4))
         end
     end
 end
@@ -300,14 +308,12 @@ function add_getextmnemonics_reply(tree, range)
     for i = 1, n do
         local lenr, lenv = rangeLong(range, base + 16)
         local sub = tree:add(range:range(base, 20 + lenv), "Entry " .. i)
-
         sub:add(f_level, rangeLong(range, base))
-        sub:add(f_input, rangeLong(range, base + 4))
         local r, v = rangeLong(range, base + 8)
         if v == 0 then
-            sub:add(r, "Output port")
+            sub:add(f_output, rangeLong(range, base + 4))
         else
-            sub:add(r, "Input port")
+            sub:add(f_input, rangeLong(range, base + 4))
         end
 
         sub:add(f_mnemonic, rangeString(range, base + 20, lenv))
@@ -363,6 +369,32 @@ function add_portstatusreply(tree, range)
     end
 end
 
+function add_extdimensions(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+    local base = 24
+    for i = 1, n do
+        local lenr, lenv = rangeLong(range, base + 12)
+        local sub = tree:add(range:range(base, lenv + 36), "Entry " .. i)
+        add_int(sub, range, base, "Router ID")
+        add_int(sub, range, base + 4, "Level ID")
+        add_int(sub, range, base + 8, "Level Number")
+        sub:add(f_mnemonic, rangeString(range, base + 16, lenv))
+        base = base + 16 + lenv
+        add_int(sub, range, base, "Level Type")
+        add_int(sub, range, base + 4, "Input Start")
+        add_int(sub, range, base + 8, "Input End")
+        add_int(sub, range, base + 12, "Output Start")
+        add_int(sub, range, base + 16, "Output End")
+    end
+end
+
+function add_errorresponse(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    addStatus(tree, range, 20)
+end
+
 function processPacket(root, range)
     local tree = root:add(range, "NP0017")
 
@@ -399,6 +431,11 @@ function processPacket(root, range)
         add_registerport(tree, range)
     elseif (c == REGISTERPORT + 0x80000000) then
         add_registerport_reply(tree, range)
+    elseif c == (GETEXTENDEDDIMENSIONS + 0x80000000) then
+        add_extdimensions(tree, range)
+    elseif c == ERRORRESPONSE then
+        add_errorresponse(tree, range)
+        tree:add(f_status, rangeLong(range, 16))
     end
 end
 
