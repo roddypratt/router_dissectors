@@ -46,6 +46,7 @@ dissectortable = {}
 
 --- A refererence to a dissector, used to call a dissector against a packet or a part of it.
 Dissector = {}
+Struct = {}
 
 --- Obtains a dissector reference by name.
 --- @param name string name of dissector
@@ -55,6 +56,9 @@ function Dissector.get(name) end
 --- Gets a Lua array table of all registered Dissector names.
 --- @return string[] The array table of registered dissector names.
 function Dissector.list() end
+
+--- @return string[] s converted from hex
+function Struct.fromhex(s) end
 
 --- @class dissector
 dissector = {}

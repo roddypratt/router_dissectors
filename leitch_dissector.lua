@@ -8,11 +8,15 @@ local f_command = ProtoField.string("leitch.command", "Command");
 local f_response = ProtoField.string("leitch.response", "Response");
 local f_body = ProtoField.string("leitch.body", "Body");
 
-leitch.fields = { f_command, f_response, f_body };
+local f_name = ProtoField.string("leitch.name", "Name");
+local f_levels = ProtoField.string("leitch.levels", "Levels");
+local f_source = ProtoField.uint16("leitch.source", "Source");
+local f_dest = ProtoField.uint16("leitch.dest", "Dest");
+leitch.fields = { f_command, f_response, f_body, f_source, f_dest, f_name, f_levels };
 
-function rangeChar(range, i)
-    local r = range:range(i, 1)
-    return r, r:uint()
+function rangeHex(range, i, len)
+    local r = range:range(i, len)
+    return r, tonumber(r:string(), 16)
 end
 
 function rangeString(range, i, len)
@@ -46,6 +50,10 @@ function processPacket(mess, root, range)
     elseif checkCommand(tree, mess, range, "@ ?", "Enable Reporting") then
     elseif checkCommand(tree, mess, range, "@ Z:", "Reset Levels") then
     elseif checkCommand(tree, mess, range, "@ X:", "Crosspoint Take") then
+        local l, d, s = string.match(mess, "^@ X:(%x+)/(%x+),(%x+)")
+        tree:add(f_levels, rangeString(range, 4, #l))
+        tree:add(f_dest, rangeHex(range, 5 + #l, #d))
+        tree:add(f_source, rangeHex(range, 6 + #l + #d, #s))
     elseif checkCommand(tree, mess, range, "@ S?", "Crosspoint Status Request") then
     elseif checkCommand(tree, mess, range, "@ Z:", "Reset Levels") then
     elseif checkCommand(tree, mess, range, "@ P:", "Preset Crosspoint") then
@@ -60,14 +68,32 @@ function processPacket(mess, root, range)
     elseif checkCommand(tree, mess, range, "@ B:E", "Execute Presets") then
     elseif checkCommand(tree, mess, range, "@ B:R", "Reset Presets") then
     elseif checkCommand(tree, mess, range, "@ K?", "Router Names Request") then
-
+        local sd, s = string.match(mess, "^@ K%?(%a)%a,(%x+)")
+        if sd == 'S' then
+            tree:add(f_source, rangeHex(range, 7, #s))
+        elseif sd == 'D' then
+            tree:add(f_dest, rangeHex(range, 7, #s))
+        end
+    elseif checkResponse(tree, mess, range, ">", "Prompt") then
     elseif checkResponse(tree, mess, range, "S:", "Crosspoint Status") then
+        local l, d, s = string.match(mess, "^S:(%x)(%x+),(%x+)")
+        tree:add(f_levels, rangeHex(range, 2, #l))
+        tree:add(f_dest, rangeHex(range, 2 + #l, #d))
+        tree:add(f_source, rangeHex(range, 3 + #l + #d, #s))
     elseif checkResponse(tree, mess, range, "V:", "Preset Crosspoint Status") then
     elseif checkResponse(tree, mess, range, "F:", "Frame Size") then
     elseif checkResponse(tree, mess, range, "Q:", "Alarm Status") then
     elseif checkResponse(tree, mess, range, "W!", "Lock/Unlock Status") then
     elseif checkResponse(tree, mess, range, "I!", "Information") then
-    elseif checkResponse(tree, mess, range, ">", "Prompt") then
+    elseif checkResponse(tree, mess, range, "K:", "Router Name") then
+        local sd, s = string.match(mess, "^K:(%a)%a(%x+)")
+        if sd == 'S' then
+            tree:add(f_source, rangeHex(range, 4, #s))
+        elseif sd == 'D' then
+            tree:add(f_dest, rangeHex(range, 4, #s))
+        end
+        local n = string.sub(mess, 6 + #s, #mess)
+        tree:add(f_name, range:range(5 + #s, #n), Struct.fromhex(n))
     else
         tree:add(f_response, range, "Unknown")
     end
