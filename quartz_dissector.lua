@@ -9,13 +9,7 @@ local f_response = ProtoField.string("quartz.response", "Response");
 local f_status = ProtoField.string("quartz.status", "Status");
 local f_body = ProtoField.string("quartz.body", "Body");
 
-quartz.fields = {f_command, f_status, f_response, f_body};
-
--- local ef_checkum = ProtoExpert.new("nevion.checksum.expert",
---                                      "Bad checksum", expert.group.MALFORMED,
---                                      expert.severity.ERROR);
-
--- nevion.experts = {ef_checkum}
+quartz.fields = { f_command, f_status, f_response, f_body };
 
 function rangeChar(range, i)
     local r = range:range(i, 1)
@@ -64,7 +58,6 @@ function processPacket(mess, root, range)
 end
 
 function quartz.dissector(tvb, pinfo, root_tree)
-
     pinfo.cols.protocol = "Quartz";
     local p = 0
     while p < tvb:len() do
