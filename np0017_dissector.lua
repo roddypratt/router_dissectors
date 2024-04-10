@@ -106,6 +106,8 @@ local f_protocol = ProtoField.uint32("np0017.protocol", "Protocol", base.HEX);
 local f_input = ProtoField.int32("np0017.input", "Input");
 local f_offset = ProtoField.int32("np0017.offset", "Offset");
 local f_level = ProtoField.int32("np0017.level", "Level");
+local f_direction = ProtoField.uint32("np0017.direction", "Direction", base.HEX, { [0] = "Output", [1] = "Input" });
+
 local f_output = ProtoField.int32("np0017.output", "Output");
 local f_userid = ProtoField.int32("np0017.userid", "User ID");
 local f_status = ProtoField.uint32("np0017.status", "Status", base.HEX,
@@ -130,11 +132,11 @@ local f_numentries = ProtoField.int32("np0017.entries", "Entries");
 local f_lockop = ProtoField.uint32("np0017.lockop", "Lock Operation", base.HEX, lockops);
 local f_mnemonic = ProtoField.string("np0017.mnemonic", "Mnemonic");
 local f_changetype = ProtoField.uint32("np0017.changetype", "Change Type", base.HEX, changetype);
-
+local f_lockstatus = ProtoField.uint32("np0017.lockstatus", "Lock Status", base.HEX, changetype);
 local f_mnemonictype = ProtoField.uint32("np0017.mnemomictype", "Mnemonic Type", base.HEX, mnemonictype);
 np0017.fields = { f_command, f_length, f_sequence, f_protocol, f_cmdreply, f_input, f_output, f_level, f_userid,
     f_numentries, f_lockop, f_mnemonictype, f_mnemonic, f_changetype, f_offset, f_charset, f_status, f_operationflag,
-    f_osequence };
+    f_osequence, f_direction, f_lockstatus };
 
 
 local ef_malformed = ProtoExpert.new("np0017.malformed.expert", "Malformed packet",
@@ -369,6 +371,37 @@ function add_portstatusreply(tree, range)
     end
 end
 
+function add_portlockstatus(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 12), "Entry " .. i)
+        sub:add(f_level, rangeLong(range, base))
+        sub:add(f_output, rangeLong(range, base + 4))
+        sub:add(f_direction, rangeLong(range, base + 8))
+
+        base = base + 12
+    end
+end
+
+function add_portlockstatusreply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 16), "Entry " .. i)
+        sub:add(f_level, rangeLong(range, base))
+        sub:add(f_output, rangeLong(range, base + 4))
+        sub:add(f_lockstatus, rangeLong(range, base + 8))
+        sub:add(f_userid, rangeLong(range, base + 12))
+        base = base + 16
+    end
+end
+
 function add_extdimensions(tree, range)
     tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
@@ -427,6 +460,10 @@ function processPacket(root, range)
         add_portstatus(tree, range)
     elseif c == GETSTATUSPORT + 0x80000000 then
         add_portstatusreply(tree, range)
+    elseif c == LOCKSTATUSPORT then
+        add_portlockstatus(tree, range)
+    elseif c == LOCKSTATUSPORT + 0x80000000 then
+        add_portlockstatusreply(tree, range)
     elseif c == REGISTERPORT then
         add_registerport(tree, range)
     elseif (c == REGISTERPORT + 0x80000000) then
