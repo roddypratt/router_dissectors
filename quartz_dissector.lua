@@ -1,4 +1,4 @@
--- Nevion MRP Protocol dissector for Wireshark.
+-- Evertz/Quartz Protocol dissector for Wireshark.
 --
 -- Copyright (C) 2021 Rascular Technology Ltd.
 --------------------------------------------------------------
@@ -11,6 +11,12 @@ local f_body = ProtoField.string("quartz.body", "Body");
 
 quartz.fields = { f_command, f_status, f_response, f_body };
 
+
+local ef_error = ProtoExpert.new("quartz.error.expert", "Error Response",
+    expert.group.RESPONSE_CODE,
+    expert.severity.ERROR);
+
+quartz.experts = { ef_error }
 function rangeChar(range, i)
     local r = range:range(i, 1)
     return r, r:uint()
@@ -40,6 +46,20 @@ function processPacket(mess, root, range)
         tree:add(f_command, range:range(0, 2), "SET MULTI")
     elseif starts_with(mess, ".F") then
         tree:add(f_command, range:range(0, 2), "FIRE SALVO")
+    elseif starts_with(mess, ".P") then
+        tree:add(f_command, range:range(0, 2), "POWER UP")
+    elseif starts_with(mess, ".BL") then
+        tree:add(f_command, range:range(0, 3), "LOCK")
+    elseif starts_with(mess, ".BU") then
+        tree:add(f_command, range:range(0, 3), "UNLOCK")
+    elseif starts_with(mess, ".BI") then
+        tree:add(f_command, range:range(0, 3), "INTERROGATE LOCK")
+    elseif starts_with(mess, ".BA") then
+        tree:add(f_command, range:range(0, 3), "LOCK STATUS")
+    elseif starts_with(mess, ".I") then
+        tree:add(f_command, range:range(0, 2), "POWER UP")
+    elseif starts_with(mess, ".#01") then
+        tree:add(f_command, range:range(0, 4), "PING")
     elseif starts_with(mess, ".RD") then
         tree:add(f_command, range:range(0, 3), "READ DEST MNEM")
     elseif starts_with(mess, ".RS") then
@@ -52,6 +72,9 @@ function processPacket(mess, root, range)
         tree:add(f_command, range:range(0, 4), "SRC MNEM")
     elseif starts_with(mess, ".RAL") then
         tree:add(f_command, range:range(0, 4), "LVL MNEM")
+    elseif starts_with(mess, ".E") then
+        tree:add_proto_expert_info(ef_error)
+        tree:add(f_command, range:range(0, 2), "ERROR")
     end
 
     tree:add(f_body, rangeString(range, 0, #mess))
