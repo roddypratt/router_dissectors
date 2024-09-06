@@ -212,10 +212,22 @@ function add_lockport(tree, range)
 
     for i = 1, n do
         local base = 24 + (i - 1) * 12
-        local sub = tree:add(range:range(base, 16), "Entry " .. i)
+        local sub = tree:add(range:range(base, 12), "Entry " .. i)
         sub:add(f_lockop, rangeLong(range, base))
         sub:add(f_level, rangeLong(range, base + 4))
         sub:add(f_output, rangeLong(range, base + 8))
+    end
+end
+
+function add_lockportreply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    for i = 1, n do
+        local base = 24 + (i - 1) * 4
+        local sub = tree:add(range:range(base, 4), "Entry " .. i)
+        addStatus(tree, range, base)
     end
 end
 
@@ -444,6 +456,8 @@ function processPacket(root, range)
         add_takeport_reply(tree, range)
     elseif c == LOCKPORT then
         add_lockport(tree, range)
+    elseif c == (LOCKPORT + 0x80000000) then
+        add_lockportreply(tree, range)
     elseif c == (GETDIMENSIONS + 0x80000000) then
         add_dimensions(tree, range)
     elseif c == GETMNEMONICS then
@@ -472,7 +486,6 @@ function processPacket(root, range)
         add_extdimensions(tree, range)
     elseif c == ERRORRESPONSE then
         add_errorresponse(tree, range)
-        tree:add(f_status, rangeLong(range, 16))
     end
 end
 
@@ -519,3 +532,4 @@ end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")
 tcp_encap_table:add(9193, np0017)
+tcp_encap_table:add(9194, np0017)
