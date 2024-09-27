@@ -206,13 +206,13 @@ function rangeString(range, mess, i, len)
 end
 
 function rangeDest12(range, mess, i)
-    return range:range(dLen(mess, i, 2)), bit32.lshift(
-        bit32.band(0x7, bit32.rshift(mess[i], 4)), 7) + mess[i + 1]
+    return range:range(dLen(mess, i, 2)), bit.lshift(
+        bit.band(0x7, bit.rshift(mess[i], 4)), 7) + mess[i + 1]
 end
 
 function rangeSrc12(range, mess, i)
     return range:range(dLen(mess, i, 3)),
-        bit32.lshift(bit32.band(mess[i], 0xf), 7) + mess[i + 2]
+        bit.lshift(bit.band(mess[i], 0xf), 7) + mess[i + 2]
 end
 
 function processPacket(mess, root, range)
@@ -288,7 +288,7 @@ function processPacket(mess, root, range)
         tree:add(f_dest16, rangeWord(range, mess, 3))
         for i = 0, 16 do
             local r, v = rangeByte(range, mess, 4 + 2 * i)
-            tree:add(f_protect, r, bit32.rshift(v, 4))
+            tree:add(f_protect, r, bit.rshift(v, 4))
         end
     elseif op == CROSSPOINT_TALLY_DUMP_REQUEST then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
@@ -334,7 +334,7 @@ function processPacket(mess, root, range)
     local sum = 0
     for i = 1, #mess - 1, 1 do sum = sum + mess[i] end
 
-    if bit32.band(-sum, 0xff) ~= mess[#mess] then
+    if bit.band(-sum, 0xff) ~= mess[#mess] then
         tree:add_proto_expert_info(ef_bad_checksum)
     end
 
@@ -363,52 +363,53 @@ end
 function lookForPacket(tvb, root_tree, startpos)
     local bytes = tvb:bytes();
     local len = bytes:len()
-    local p = startpos
-    local start = 0
 
-    while p < (len - 1) do
-        if (bytes:get_index(p) == DLE) and (p + 1 < len) and
-            (bytes:get_index(p + 1) == ACK) then
-            processACK(root_tree, tvb:range(p, 2))
-            return p, 2;
-        elseif (bytes:get_index(p) == DLE) and (p + 1 < len) and
-            (bytes:get_index(p + 1) == NAK) then
-            processNAK(root_tree, tvb:range(p, 2))
-            return p, 2;
-        elseif (bytes:get_index(p) == DLE) and (p + 1 < len) and
-            (bytes:get_index(p + 1) == STX) then
-            start = p
-            -- print("Found start ", start)
-            p = p + 2
-            local mess = {}
-            while p < len do
-                local c = bytes:get_index(p)
-                p = p + 1
-                if c ~= DLE then
-                    mess[#mess + 1] = c
-                else
-                    if p < len then
-                        c = bytes:get_index(p)
-                        p = p + 1
-                        if c == DLE then
-                            mess[#mess + 1] = c
-                        elseif c == ETX then
-                            local range = tvb:range(start, p - start)
-                            processPacket(mess, root_tree, range)
-                            return start, p - start
-                        else
-                            root_tree:add_proto_expert_info(ef_bad_dle)
-                            print("Bad DLE, Returning ", p)
-                            return start, p
-                        end
+    if len < 2 then return startpos end
+
+    local p = startpos
+
+    if (bytes:get_index(p) == DLE) and (bytes:get_index(p + 1) == ACK) then
+        processACK(root_tree, tvb:range(p, 2))
+        -- print("Processed Ack", p)
+        return p, 2;
+    elseif (bytes:get_index(p) == DLE) and (bytes:get_index(p + 1) == NAK) then
+        processNAK(root_tree, tvb:range(p, 2))
+        -- print("Processed NAK", p)
+        return p, 2;
+    elseif (bytes:get_index(p) == DLE) and (bytes:get_index(p + 1) == STX) then
+        local start = p
+        -- print("Found start ", start)
+        p = p + 2
+        local mess = {}
+        while p < len do
+            local c = bytes:get_index(p)
+            p = p + 1
+            if c ~= DLE then
+                mess[#mess + 1] = c
+            else
+                if p < len then
+                    c = bytes:get_index(p)
+                    p = p + 1
+                    if c == DLE then
+                        mess[#mess + 1] = c
+                    elseif c == ETX then
+                        local range = tvb:range(start, p - start)
+                        processPacket(mess, root_tree, range)
+                        -- print("Processed ", start, p - start)
+                        return start, p - start
+                    else
+                        root_tree:add_proto_expert_info(ef_bad_dle)
+                        print("Bad DLE, Returning ", p)
+                        return start, p - start
                     end
                 end
             end
         end
-        p = p + 1
+    else
+        return p, 1
     end
 
-    return p -- packet is segmented or no start found.
+    return startpos -- packet is segmented or no start found.
 end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")

@@ -15,23 +15,23 @@
 ## Using the Dissectors
 
 Either copy `xxx_dissector.lua` to your Wireshark plugins folder, or start wireshark (e.g. from Powershell) like this:
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:gvg_native_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:gvg_native_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:harris_lrc_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:harris_lrc_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:leitch_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:leitch_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:nevion_mrp_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:nevion_mrp_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:np0017_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:np0017_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:probel_swp08_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:probel_swp08_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:probel_swp02_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:probel_swp02_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:quartz_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:quartz_dissector.lua`
 
-`& "c:\program files\wireshark\wireshark.exe" -X lua_script:utah_rcp3a_dissector.lua`
+`& "c:\program files\Wireshark\wireshark.exe" -X lua_script:utah_rcp3a_dissector.lua`
 
 If your router is using a different TCP port you can use wireshark's "Decode As.." function to specify the port and protocol.
 

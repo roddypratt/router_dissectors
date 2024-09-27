@@ -518,9 +518,10 @@ function lookForPacket(tvb, root_tree, startpos)
     local plen = bytes:int(startpos + 8, 4)
 
     if plen < 16 or plen > 8192 then
-        root_tree:add_tvb_expert_info(ef_malformed, tvb(startpos, 4), "invalid protocol")
+        root_tree:add_tvb_expert_info(ef_malformed, tvb(startpos, 4), "invalid length")
         return startpos + 12
     end
+
 
     if (len >= plen) then
         processPacket(root_tree, tvb:range(startpos, plen))

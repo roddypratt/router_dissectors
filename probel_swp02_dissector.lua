@@ -100,7 +100,7 @@ local f_checksum = ProtoField.uint8("swp.checksum", "Checksum");
 local f_status = ProtoField.uint8("swp.status", "Status");
 
 local f_go = ProtoField.uint8("swp.go", "Go", base.HEX,
-                              {"Set", "Clear", "None Selected"})
+    { "Set", "Clear", "None Selected" })
 local f_count = ProtoField.uint8("swp.count", "Count");
 
 p_swp02.fields = {
@@ -109,10 +109,10 @@ p_swp02.fields = {
 };
 
 local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
-                                        expert.group.MALFORMED,
-                                        expert.severity.ERROR);
+    expert.group.MALFORMED,
+    expert.severity.ERROR);
 
-p_swp02.experts = {ef_bad_checksum}
+p_swp02.experts = { ef_bad_checksum }
 
 local SOM = 0xFF
 
@@ -124,21 +124,21 @@ end
 function rangeWord14(range, i)
     local r = range:range(i, 2)
     local buff = r:bytes()
-    return r, bit32.lshift(buff:get_index(0), 7) + buff:get_index(1)
+    return r, bit.lshift(buff:get_index(0), 7) + buff:get_index(1)
 end
 
 function rangeDest10(range, i)
     local r = range:range(i, 2)
     local buff = r:bytes()
-    return r, bit32.lshift(bit32.band(buff:get_index(0), 0x70), 3) +
-               buff:get_index(1)
+    return r, bit.lshift(bit.band(buff:get_index(0), 0x70), 3) +
+        buff:get_index(1)
 end
 
 function rangeSrc10(range, i)
     local r = range:range(i, 3)
     local buff = r:bytes()
-    return r, bit32.lshift(bit32.band(buff:get_index(0), 0x7), 7) +
-               buff:get_index(2)
+    return r, bit.lshift(bit.band(buff:get_index(0), 0x7), 7) +
+        buff:get_index(2)
 end
 
 function processPacket(root, range)
@@ -174,14 +174,13 @@ function processPacket(root, range)
     local sum = 0
     for i = 1, mess:len() - 2 do sum = sum + mess:get_index(i) end
 
-    if bit32.band(-sum, 0x7f) ~= mess:get_index(mess:len() - 1) then
+    if bit.band(-sum, 0x7f) ~= mess:get_index(mess:len() - 1) then
         tree:add_proto_expert_info(ef_bad_checksum)
     end
     tree:add(f_checksum, rangeByte(range, mess:len() - 1))
 end
 
 function p_swp02.dissector(tvb, pinfo, root_tree)
-
     pinfo.cols.protocol = "SW-P-02";
     local p = 0
     while p < tvb:len() do
@@ -209,7 +208,6 @@ function lookForPacket(tvb, root_tree, startpos)
 
             local cmd = bytes:get_index(p + 1) -- command byte found
             if lengths[cmd] and ((p + 2 + lengths[cmd]) < len) then
-
                 local range = tvb:range(start, 3 + lengths[cmd])
                 processPacket(root_tree, range)
                 return start, range:len()
@@ -223,4 +221,3 @@ end
 
 local tcp_encap_table = DissectorTable.get("tcp.port")
 tcp_encap_table:add(2006, p_swp02)
-
