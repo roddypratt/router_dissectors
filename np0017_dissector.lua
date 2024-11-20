@@ -1,4 +1,4 @@
--- Nevion MRP Protocol dissector for Wireshark.
+-- GrassValley np0017 dissector for Wireshark.
 --
 -- Copyright (C) 2023 Rascular Technology Ltd.
 --------------------------------------------------------------
