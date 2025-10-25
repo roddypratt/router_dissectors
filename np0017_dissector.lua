@@ -30,15 +30,17 @@ local GETEXTMNEMONICS = 0x3022
 local FINDEXTMNEMONICS = 0x3033
 local GETEXTMNEMONICSPORT = 0x3025
 local ERRORRESPONSE = 0x80000000
+local SIMPLEDEVICESTATUS = 0x3017
 
 local commands = {
+    [0] = "ERROR",
     [TAKE] = "TAKE DEVICE",
     [TAKEPORT] = "TAKE PORT",
     [LOCK] = "LOCK/PROTECT DEVICE",
     [LOCKPORT] = "LOCK/PROTECT PORT",
     [REGISTER] = "REGISTER FOR CHANGES",
     [REGISTERPORT] = "REGISTER FOR PORT CHANGES",
-    [GETSTATUS] = "GET DEVICE SFTATUS",
+    [GETSTATUS] = "GET DEVICE STATUS",
     [GETSTATUSPORT] = "GET PORT STATUS",
     [LOCKSTATUS] = "GET DEVICE LOCK STATUS",
     [LOCKSTATUSPORT] = "GET PORT LOCK STATUS",
@@ -57,7 +59,8 @@ local commands = {
     [GETEXTMNEMONICS] = "GET EXTENDED DEVICE MNEMONICS",
     [FINDEXTMNEMONICS] = "FIND EXTENDED DEVICE MNEMONICS",
     [GETEXTMNEMONICSPORT] = "GET EXTENDED PORT MNEMONICS",
-    [ERRORRESPONSE] = "ERROR RESPONSE"
+    [ERRORRESPONSE] = "ERROR RESPONSE",
+    [SIMPLEDEVICESTATUS] = "SIMPLE DEVICE STATUS"
 }
 
 
@@ -104,9 +107,14 @@ local f_cmdreply = ProtoField.uint32("np0017.cmdreply", "Cmd/Reply", base.HEX,
     { [0] = "Command", [0x80000000] = "Reply" });
 local f_protocol = ProtoField.uint32("np0017.protocol", "Protocol", base.HEX);
 local f_input = ProtoField.int32("np0017.input", "Input");
+local f_device = ProtoField.int32("np0017.device", "Device ID");
+
 local f_offset = ProtoField.int32("np0017.offset", "Offset");
 local f_level = ProtoField.int32("np0017.level", "Level");
 local f_direction = ProtoField.uint32("np0017.direction", "Direction", base.HEX, { [0] = "Output", [1] = "Input" });
+
+local f_primaryLevel = ProtoField.uint32("np0017.primaryLevel", "Primary Level", base.HEX,
+    { [0] = "All Levels", [1] = "Primary only" });
 
 local f_output = ProtoField.int32("np0017.output", "Output");
 local f_userid = ProtoField.int32("np0017.userid", "User ID");
@@ -136,7 +144,7 @@ local f_lockstatus = ProtoField.uint32("np0017.lockstatus", "Lock Status", base.
 local f_mnemonictype = ProtoField.uint32("np0017.mnemomictype", "Mnemonic Type", base.HEX, mnemonictype);
 np0017.fields = { f_command, f_length, f_sequence, f_protocol, f_cmdreply, f_input, f_output, f_level, f_userid,
     f_numentries, f_lockop, f_mnemonictype, f_mnemonic, f_changetype, f_offset, f_charset, f_status, f_operationflag,
-    f_osequence, f_direction, f_lockstatus };
+    f_osequence, f_direction, f_lockstatus, f_primaryLevel, f_device };
 
 
 local ef_malformed = ProtoExpert.new("np0017.malformed.expert", "Malformed packet",
@@ -147,7 +155,12 @@ local ef_badstatus = ProtoExpert.new("np0017.badstatus.expert", "Bad Status",
     expert.group.RESPONSE_CODE,
     expert.severity.WARN);
 
-np0017.experts = { ef_malformed, ef_badstatus }
+local ef_commandError = ProtoExpert.new("np0017.commanderror.expert", "Command Error",
+    expert.group.RESPONSE_CODE,
+    expert.severity.ERROR);
+
+
+np0017.experts = { ef_malformed, ef_badstatus, ef_commandError }
 
 function rangeLong(rr, i)
     local r = rr:range(i, 4)
@@ -216,6 +229,21 @@ function add_lockport(tree, range)
         sub:add(f_lockop, rangeLong(range, base))
         sub:add(f_level, rangeLong(range, base + 4))
         sub:add(f_output, rangeLong(range, base + 8))
+    end
+end
+
+function add_lockdevice(tree, range)
+    tree:add(f_userid, rangeLong(range, 16))
+
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    for i = 1, n do
+        local base = 24 + (i - 1) * 12
+        local sub = tree:add(range:range(base, 12), "Entry " .. i)
+        sub:add(f_lockop, rangeLong(range, base))
+        sub:add(f_device, rangeLong(range, base + 4))
+        sub:add(f_level, rangeLong(range, base + 8))
     end
 end
 
@@ -354,6 +382,26 @@ function add_portchanged(tree, range)
     end
 end
 
+function add_device_changed(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 24), "Entry " .. i)
+        sub:add(f_changetype, rangeLong(range, base))
+
+        add_int(sub, range, base + 4, "Destination Device")
+        add_int(sub, range, base + 8, "Dest VLevel")
+        add_int(sub, range, base + 12, "Source Device")
+        add_int(sub, range, base + 16, "Source VLevel")
+        add_int(sub, range, base + 20, "User ID")
+        addStatus(sub, range, base + 24)
+
+        base = base + 28
+    end
+end
+
 function add_portstatus(tree, range)
     local f, n = rangeLong(range, 16)
     tree:add(f_numentries, f, n)
@@ -414,6 +462,36 @@ function add_portlockstatusreply(tree, range)
     end
 end
 
+function add_lockstatus(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 8), "Entry " .. i)
+        sub:add(f_device, rangeLong(range, base))
+        sub:add(f_level, rangeLong(range, base + 4))
+        sub:add(f_direction, rangeLong(range, base + 8))
+        base = base + 12
+    end
+end
+
+function add_lockstatusreply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 16), "Entry " .. i)
+        sub:add(f_device, rangeLong(range, base))
+        sub:add(f_level, rangeLong(range, base + 4))
+        sub:add(f_lockstatus, rangeLong(range, base + 8))
+        sub:add(f_userid, rangeLong(range, base + 12))
+        base = base + 16
+    end
+end
+
 function add_extdimensions(tree, range)
     tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
@@ -435,9 +513,66 @@ function add_extdimensions(tree, range)
     end
 end
 
+function add_devicestatus(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 8), "Entry " .. i)
+        add_int(sub, range, base, "Destination Device")
+        add_int(sub, range, base + 4, "Dest VLevel")
+        add_int(sub, range, base + 8, "Source Device")
+        add_int(sub, range, base + 12, "Source VLevel")
+        sub:add(f_status, rangeLong(range, base + 16))
+        base = base + 20
+    end
+end
+
 function add_errorresponse(tree, range)
     tree:add(f_osequence, rangeLong(range, 16))
     addStatus(tree, range, 20)
+end
+
+function add_simpledevicestatus(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 8), "Entry " .. i)
+        sub:add(f_device, rangeLong(range, base))
+        sub:add(f_primaryLevel, rangeLong(range, base + 4))
+        base = base + 8
+    end
+end
+
+function add_take(tree, range)
+    tree:add(f_userid, rangeLong(range, 16))
+    add_int(tree, range, 20, "Destination Device")
+    local f, n = rangeLong(range, 24)
+    tree:add(f_numentries, f, n)
+
+    for i = 1, n do
+        local base = 28 + (i - 1) * 16
+        local sub = tree:add(range:range(base, 16), "Entry " .. i)
+        add_int(sub, range, base, "Dest VLevel")
+        add_int(sub, range, base + 4, "Source Device")
+        add_int(sub, range, base + 8, "Source VLevel")
+        add_int(sub, range, base + 12, "Take Mode")
+    end
+end
+
+function add_take_reply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    for i = 1, n do
+        local base = 24 + (i - 1) * 4
+        tree:add(f_status, rangeLong(range, base))
+    end
 end
 
 function processPacket(root, range)
@@ -450,10 +585,14 @@ function processPacket(root, range)
     tree:add(f_command, r, bit.band(c, 0x0000FFFF))
     tree:add(f_cmdreply, r, bit.band(c, 0x80000000))
 
-    if c == TAKEPORT then
+    if c == 0x80000000 then
+        tree:add_tvb_expert_info(ef_commandError, range, "Command Error")
+    elseif c == TAKEPORT then
         add_takeport(tree, range)
     elseif c == (TAKEPORT + 0x80000000) then
         add_takeport_reply(tree, range)
+    elseif c == LOCK then
+        add_lockdevice(tree, range)
     elseif c == LOCKPORT then
         add_lockport(tree, range)
     elseif c == (LOCKPORT + 0x80000000) then
@@ -464,6 +603,8 @@ function processPacket(root, range)
         add_getdevmnemonics(tree, range)
     elseif c == (GETMNEMONICS + 0x80000000) then
         add_getdevmnemonics_reply(tree, range)
+    elseif (c == GETSTATUS + 0x80000000) then
+        add_devicestatus(tree, range)
     elseif c == GETEXTMNEMONICSPORT then
         add_getextmnemonics(tree, range)
     elseif (c == GETEXTMNEMONICSPORT + 0x80000000) then
@@ -478,12 +619,24 @@ function processPacket(root, range)
         add_portlockstatus(tree, range)
     elseif c == LOCKSTATUSPORT + 0x80000000 then
         add_portlockstatusreply(tree, range)
+    elseif c == LOCKSTATUS then
+        add_lockstatus(tree, range)
+    elseif c == LOCKSTATUS + 0x80000000 then
+        add_lockstatusreply(tree, range)
     elseif c == REGISTERPORT then
         add_registerport(tree, range)
     elseif (c == REGISTERPORT + 0x80000000) then
         add_registerport_reply(tree, range)
     elseif c == (GETEXTENDEDDIMENSIONS + 0x80000000) then
         add_extdimensions(tree, range)
+    elseif c == SIMPLEDEVICESTATUS then
+        add_simpledevicestatus(tree, range)
+    elseif c == TAKE then
+        add_take(tree, range)
+    elseif c == (TAKE + 0x80000000) then
+        add_take_reply(tree, range)
+    elseif c == STATUSCHANGED then
+        add_device_changed(tree, range)
     elseif c == ERRORRESPONSE then
         add_errorresponse(tree, range)
     end
