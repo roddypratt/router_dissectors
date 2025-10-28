@@ -510,6 +510,7 @@ function add_extdimensions(tree, range)
         add_int(sub, range, base + 8, "Input End")
         add_int(sub, range, base + 12, "Output Start")
         add_int(sub, range, base + 16, "Output End")
+        base = base + 20
     end
 end
 
