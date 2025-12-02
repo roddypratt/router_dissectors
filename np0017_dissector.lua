@@ -499,11 +499,12 @@ function add_extdimensions(tree, range)
     local base = 24
     for i = 1, n do
         local lenr, lenv = rangeLong(range, base + 12)
+        lenv = lenv * 2 --unicode
         local sub = tree:add(range:range(base, lenv + 36), "Entry " .. i)
         add_int(sub, range, base, "Router ID")
         add_int(sub, range, base + 4, "Level ID")
         add_int(sub, range, base + 8, "Level Number")
-        sub:add(f_mnemonic, rangeString(range, base + 16, lenv))
+        sub:add(f_mnemonic, rangeUString(range, base + 16, lenv))
         base = base + 16 + lenv
         add_int(sub, range, base, "Level Type")
         add_int(sub, range, base + 4, "Input Start")
@@ -671,13 +672,15 @@ function lookForPacket(tvb, root_tree, startpos)
 
     local plen = bytes:int(startpos + 8, 4)
 
-    if plen < 16 or plen > 8192 then
+    if plen < 16 then
         root_tree:add_tvb_expert_info(ef_malformed, tvb(startpos, 4), "invalid length")
         return startpos + 12
     end
 
-
     if (len >= plen) then
+        if plen > 8192 then
+            root_tree:add_tvb_expert_info(ef_malformed, tvb(startpos, 4), "long packet")
+        end
         processPacket(root_tree, tvb:range(startpos, plen))
         return startpos, plen
     else
