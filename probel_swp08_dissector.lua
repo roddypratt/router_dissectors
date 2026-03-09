@@ -41,6 +41,11 @@ local EXT_CROSSPOINT_TALLY_DUMP_REQUEST = CROSSPOINT_TALLY_DUMP_REQUEST + 0x80
 local EXT_CROSSPOINT_TALLY_DUMP_RESPONSE =
     CROSSPOINT_TALLY_DUMP_RESPONSE_WORD + 0x80
 
+local EXT_ALL_SOURCE_NAMES = ALL_SOURCE_NAMES + 0x80
+local EXT_ALL_DESTINATION_NAMES = ALL_DESTINATION_NAMES + 0x80
+local EXT_SOURCE_NAMES_RESPONSE = SOURCE_NAMES_RESPONSE + 0x80
+local EXT_DESTINATION_NAMES_RESPONSE = DESTINATION_NAMES_RESPONSE + 0x80
+
 local codes = {
     [0] = "COMMAND_ENABLE",
     [CROSSPOINT_INTERROGATE] = "CROSSPOINT_INTERROGATE",
@@ -57,7 +62,7 @@ local codes = {
     [PROTECT_DISCONNECT] = "PROTECT_DISCONNECT",
     [PROTECT_DISCONNECTED] = "PROTECT_DISCONNECTED",
     [17] = "PROTECT_DEVICE_NAME_REQUEST",
-    [18] = "PROTECT_DEVICE_NAME_RESONSE",
+    [18] = "PROTECT_DEVICE_NAME_RESPONSE",
     [PROTECT_TALLY_DUMP_REQUEST] = "PROTECT_TALLY_DUMP_REQUEST",
     [PROTECT_TALLY_DUMP_RESPONSE] = "PROTECT_TALLY_DUMP_RESPONSE",
     [CROSSPOINT_TALLY_DUMP_REQUEST] = "CROSSPOINT_TALLY_DUMP_REQUEST",
@@ -91,7 +96,7 @@ local codes = {
     [103] = "SINGLE_DESTINATION_NAME",
     [104] = "ALL_UMD_LABELS",
     [105] = "SINGLE_UMD_LABEL",
-    [SOURCE_NAMES_RESPONSE] = "SOURCE_NAMES_RESONSE",
+    [SOURCE_NAMES_RESPONSE] = "SOURCE_NAMES_RESPONSE",
     [DESTINATION_NAMES_RESPONSE] = "DESTINATION_NAMES_RESPONSE",
     [108] = "UMD_LABELS_RESPONSE",
 
@@ -123,6 +128,11 @@ local codes = {
     [EXT_PROTECT_DISCONNECTED] = "EXT_PROTECT_DISCONNECTED",
     [EXT_CROSSPOINT_TALLY_DUMP_REQUEST] = "EXT_CROSSPOINT_TALLY_DUMP_REQUEST",
     [EXT_CROSSPOINT_TALLY_DUMP_RESPONSE] = "EXT_CROSSPOINT_TALLY_DUMP_RESPONSE",
+
+    [EXT_ALL_SOURCE_NAMES] = "EXT_ALL_SOURCE_NAMES",
+    [EXT_ALL_DESTINATION_NAMES] = "EXT_ALL_DESTINATION_NAMES",
+    [EXT_SOURCE_NAMES_RESPONSE] = "EXT_SOURCE_NAMES_RESPONSE",
+    [EXT_DESTINATION_NAMES_RESPONSE] = "EXT_DESTINATION_NAMES_RESPONSE",
 
     [0x1006] = "ACK",
     [0x1015] = "NAK"
@@ -172,13 +182,17 @@ local ef_bad_length = ProtoExpert.new("swp.length.expert", "Bad length",
     expert.group.MALFORMED,
     expert.severity.ERROR);
 
+local ef_empty = ProtoExpert.new("swp.empty.expert", "Empty packet",
+    expert.group.MALFORMED,
+    expert.severity.WARN);
+
 local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
     expert.group.MALFORMED,
     expert.severity.ERROR);
 local ef_bad_dle = ProtoExpert.new("swp.baddle.expert", "Bad DLE sequence",
     expert.group.MALFORMED, expert.severity.ERROR);
 
-p_swp08.experts = { ef_bad_length, ef_bad_checksum, ef_bad_dle }
+p_swp08.experts = { ef_bad_length, ef_bad_checksum, ef_bad_dle, ef_empty }
 
 local DLE = 0x10
 local STX = 2
@@ -217,6 +231,11 @@ end
 
 function processPacket(mess, root, range)
     local tree = root:add(range, "SW-P-08")
+
+    if mess[#mess - 1] == 0 then
+        tree:add_proto_expert_info(ef_empty)
+        return
+    end
     local op = mess[1]
 
     tree:add(f_opcode, rangeByte(range, mess, 1))
@@ -264,7 +283,7 @@ function processPacket(mess, root, range)
         tree:add(f_protect, rangeByte(range, mess, 4))
         tree:add(f_dest16, rangeWord(range, mess, 5))
         tree:add(f_device, rangeWord(range, mess, 7))
-    elseif op == SOURCE_NAMES_RESPONSE or op == DESTINATION_NAMES_RESPONSE then
+    elseif op == SOURCE_NAMES_RESPONSE or op == DESTINATION_NAMES_RESPONSE or op == EXT_DESTINATION_NAMES_RESPONSE then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
         tree:add(f_start, rangeWord(range, mess, 4))
@@ -275,9 +294,26 @@ function processPacket(mess, root, range)
         for i = 0, mess[6] - 1 do
             tree:add(f_name, rangeString(range, mess, 7 + (i * len), len))
         end
-    elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES then
+    elseif op == EXT_SOURCE_NAMES_RESPONSE then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+
+        tree:add(f_namelength, rangeByte(range, mess, 4))
+        tree:add(f_start, rangeWord(range, mess, 5))
+        tree:add(f_count, rangeByte(range, mess, 7))
+
+        local len = namelengths[mess[4]];
+
+        for i = 0, mess[7] - 1 do
+            tree:add(f_name, rangeString(range, mess, 8 + (i * len), len))
+        end
+    elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES or op == EXT_ALL_DESTINATION_NAMES then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
+    elseif op == EXT_ALL_SOURCE_NAMES then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+        tree:add(f_namelength, rangeByte(range, mess, 4))
     elseif op == PROTECT_TALLY_DUMP_REQUEST then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_level4, rangeByte(range, mess, 2))
