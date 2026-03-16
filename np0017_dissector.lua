@@ -32,6 +32,9 @@ local GETEXTMNEMONICSPORT = 0x3025
 local ERRORRESPONSE = 0x80000000
 local SIMPLEDEVICESTATUS = 0x3017
 
+
+local REPLYBIT = 0x80000000
+
 local commands = {
     [0] = "ERROR",
     [TAKE] = "TAKE DEVICE",
@@ -104,7 +107,7 @@ local f_length = ProtoField.int32("np0017.length", "Length");
 local f_sequence = ProtoField.uint32("np0017.sequence", "Sequence");
 local f_osequence = ProtoField.uint32("np0017.osequence", "Originating Sequence");
 local f_cmdreply = ProtoField.uint32("np0017.cmdreply", "Cmd/Reply", base.HEX,
-    { [0] = "Command", [0x80000000] = "Reply" });
+    { [0] = "Command", [REPLYBIT] = "Reply" });
 local f_protocol = ProtoField.uint32("np0017.protocol", "Protocol", base.HEX);
 local f_input = ProtoField.int32("np0017.input", "Input");
 local f_device = ProtoField.int32("np0017.device", "Device ID");
@@ -248,6 +251,18 @@ function add_lockdevice(tree, range)
 end
 
 function add_lockportreply(tree, range)
+    tree:add(f_osequence, rangeLong(range, 16))
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    for i = 1, n do
+        local base = 24 + (i - 1) * 4
+        local sub = tree:add(range:range(base, 4), "Entry " .. i)
+        addStatus(tree, range, base)
+    end
+end
+
+function add_lockreply(tree, range)
     tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
     tree:add(f_numentries, f, n)
@@ -477,6 +492,7 @@ function add_lockstatus(tree, range)
 end
 
 function add_lockstatusreply(tree, range)
+    print("Lock Status Reply")
     tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
     tree:add(f_numentries, f, n)
@@ -585,57 +601,59 @@ function processPacket(root, range)
     tree:add(f_length, rangeLong(range, 8))
     local r, c = rangeLong(range, 12)
     tree:add(f_command, r, bit.band(c, 0x0000FFFF))
-    tree:add(f_cmdreply, r, bit.band(c, 0x80000000))
+    tree:add(f_cmdreply, r, bit.band(c, REPLYBIT))
 
     if c == 0x80000000 then
         tree:add_tvb_expert_info(ef_commandError, range, "Command Error")
     elseif c == TAKEPORT then
         add_takeport(tree, range)
-    elseif c == (TAKEPORT + 0x80000000) then
+    elseif c == (TAKEPORT + REPLYBIT) then
         add_takeport_reply(tree, range)
     elseif c == LOCK then
         add_lockdevice(tree, range)
+    elseif c == (LOCK + REPLYBIT) then
+        add_lockreply(tree, range)
     elseif c == LOCKPORT then
         add_lockport(tree, range)
-    elseif c == (LOCKPORT + 0x80000000) then
+    elseif c == (LOCKPORT + REPLYBIT) then
         add_lockportreply(tree, range)
-    elseif c == (GETDIMENSIONS + 0x80000000) then
+    elseif c == (GETDIMENSIONS + REPLYBIT) then
         add_dimensions(tree, range)
     elseif c == GETMNEMONICS then
         add_getdevmnemonics(tree, range)
-    elseif c == (GETMNEMONICS + 0x80000000) then
+    elseif c == (GETMNEMONICS + REPLYBIT) then
         add_getdevmnemonics_reply(tree, range)
-    elseif (c == GETSTATUS + 0x80000000) then
+    elseif (c == GETSTATUS + REPLYBIT) then
         add_devicestatus(tree, range)
     elseif c == GETEXTMNEMONICSPORT then
         add_getextmnemonics(tree, range)
-    elseif (c == GETEXTMNEMONICSPORT + 0x80000000) then
+    elseif (c == GETEXTMNEMONICSPORT + REPLYBIT) then
         add_getextmnemonics_reply(tree, range)
     elseif c == STATUSCHANGEDPORT then
         add_portchanged(tree, range)
     elseif c == GETSTATUSPORT then
         add_portstatus(tree, range)
-    elseif c == GETSTATUSPORT + 0x80000000 then
+    elseif c == GETSTATUSPORT + REPLYBIT then
         add_portstatusreply(tree, range)
     elseif c == LOCKSTATUSPORT then
         add_portlockstatus(tree, range)
-    elseif c == LOCKSTATUSPORT + 0x80000000 then
+    elseif c == (LOCKSTATUSPORT + REPLYBIT) then
         add_portlockstatusreply(tree, range)
     elseif c == LOCKSTATUS then
         add_lockstatus(tree, range)
-    elseif c == LOCKSTATUS + 0x80000000 then
+    elseif c == (LOCKSTATUS + REPLYBIT) then
         add_lockstatusreply(tree, range)
     elseif c == REGISTERPORT then
         add_registerport(tree, range)
-    elseif (c == REGISTERPORT + 0x80000000) then
+    elseif (c == REGISTERPORT + REPLYBIT) then
         add_registerport_reply(tree, range)
-    elseif c == (GETEXTENDEDDIMENSIONS + 0x80000000) then
+    elseif c == (GETEXTENDEDDIMENSIONS + REPLYBIT) then
         add_extdimensions(tree, range)
     elseif c == SIMPLEDEVICESTATUS then
         add_simpledevicestatus(tree, range)
     elseif c == TAKE then
         add_take(tree, range)
-    elseif c == (TAKE + 0x80000000) then
+    elseif c == (TAKE + REPLYBIT) then
         add_take_reply(tree, range)
     elseif c == STATUSCHANGED then
         add_device_changed(tree, range)
