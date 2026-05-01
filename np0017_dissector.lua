@@ -99,6 +99,15 @@ local changetype = {
     [6] = "Input Released"
 }
 
+local registertype = {
+    [0] = "Crosspoint change",
+    [1] = "Output Lock/Protect",
+    [2] = "Input Lock/Protect",
+    [3] = "Drop All",
+    [4] = "Drop Crosspoint",
+    [5] = "Drop Output Lock/Protect",
+    [6] = "Drop Input Lock/Protect"
+}
 local charset = { [0] = "ASCII", [1] = "UCS-16" }
 
 local f_command = ProtoField.uint32("np0017.command", "Command", base.HEX, commands);
@@ -139,6 +148,8 @@ local f_operationflag = ProtoField.uint32("np0017.opflag", "Operation", base.HEX
         [4] = "Drop input",
         [5] = "Drop output"
     });
+
+local f_registertype = ProtoField.uint32("np0017.registertype", "Registration Type", base.HEX, registertype);
 local f_numentries = ProtoField.int32("np0017.entries", "Entries");
 local f_lockop = ProtoField.uint32("np0017.lockop", "Lock Operation", base.HEX, lockops);
 local f_mnemonic = ProtoField.string("np0017.mnemonic", "Mnemonic");
@@ -147,7 +158,7 @@ local f_lockstatus = ProtoField.uint32("np0017.lockstatus", "Lock Status", base.
 local f_mnemonictype = ProtoField.uint32("np0017.mnemomictype", "Mnemonic Type", base.HEX, mnemonictype);
 np0017.fields = { f_command, f_length, f_sequence, f_protocol, f_cmdreply, f_input, f_output, f_level, f_userid,
     f_numentries, f_lockop, f_mnemonictype, f_mnemonic, f_changetype, f_offset, f_charset, f_status, f_operationflag,
-    f_osequence, f_direction, f_lockstatus, f_primaryLevel, f_device };
+    f_osequence, f_direction, f_lockstatus, f_primaryLevel, f_device, f_registertype };
 
 
 local ef_malformed = ProtoExpert.new("np0017.malformed.expert", "Malformed packet",
@@ -492,7 +503,6 @@ function add_lockstatus(tree, range)
 end
 
 function add_lockstatusreply(tree, range)
-    print("Lock Status Reply")
     tree:add(f_osequence, rangeLong(range, 16))
     local f, n = rangeLong(range, 20)
     tree:add(f_numentries, f, n)
@@ -593,6 +603,31 @@ function add_take_reply(tree, range)
     end
 end
 
+function add_registerchanges(tree, range)
+    local f, n = rangeLong(range, 16)
+    tree:add(f_numentries, f, n)
+
+    local base = 20
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 8), "Entry " .. i)
+        sub:add(f_registertype, rangeLong(range, base))
+        sub:add(f_device, rangeLong(range, base + 4))
+        base = base + 8
+    end
+end
+
+function add_registerchanges_reply(tree, range)
+    local f, n = rangeLong(range, 20)
+    tree:add(f_numentries, f, n)
+
+    local base = 24
+    for i = 1, n do
+        local sub = tree:add(range:range(base, 4), "Entry " .. i)
+        addStatus(sub, range, base)
+        base = base + 4
+    end
+end
+
 function processPacket(root, range)
     local tree = root:add(range, "NP0017")
 
@@ -657,6 +692,10 @@ function processPacket(root, range)
         add_take_reply(tree, range)
     elseif c == STATUSCHANGED then
         add_device_changed(tree, range)
+    elseif c == REGISTER then
+        add_registerchanges(tree, range)
+    elseif c == (REGISTER + REPLYBIT) then
+        add_registerchanges_reply(tree, range)
     elseif c == ERRORRESPONSE then
         add_errorresponse(tree, range)
     end
