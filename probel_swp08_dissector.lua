@@ -283,8 +283,9 @@ function processPacket(mess, root, range)
         tree:add(f_protect, rangeByte(range, mess, 4))
         tree:add(f_dest16, rangeWord(range, mess, 5))
         tree:add(f_device, rangeWord(range, mess, 7))
-    elseif op == SOURCE_NAMES_RESPONSE or op == DESTINATION_NAMES_RESPONSE or op == EXT_DESTINATION_NAMES_RESPONSE then
-        tree:add(f_matrix8, rangeByte(range, mess, 2))
+    elseif op == SOURCE_NAMES_RESPONSE or op == DESTINATION_NAMES_RESPONSE then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
         tree:add(f_namelength, rangeByte(range, mess, 3))
         tree:add(f_start, rangeWord(range, mess, 4))
         tree:add(f_count, rangeByte(range, mess, 6))
@@ -294,10 +295,9 @@ function processPacket(mess, root, range)
         for i = 0, mess[6] - 1 do
             tree:add(f_name, rangeString(range, mess, 7 + (i * len), len))
         end
-    elseif op == EXT_SOURCE_NAMES_RESPONSE then
+    elseif op == EXT_SOURCE_NAMES_RESPONSE or op == EXT_DESTINATION_NAMES_RESPONSE then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
         tree:add(f_level8, rangeByte(range, mess, 3))
-
         tree:add(f_namelength, rangeByte(range, mess, 4))
         tree:add(f_start, rangeWord(range, mess, 5))
         tree:add(f_count, rangeByte(range, mess, 7))
