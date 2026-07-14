@@ -377,9 +377,15 @@ function processPacket(mess, root, range)
     tree:add(f_checksum, rangeByte(range, mess, #mess))
 end
 
-function processACK(root, range) root:add(f_opcode, range) end
+function processACK(root, range)
+    local tree = root:add(range, "SW-P-08")
+    tree:add(f_opcode, range)
+end
 
-function processNAK(root, range) root:add(f_opcode, range) end
+function processNAK(root, range)
+    local tree = root:add(range, "SW-P-08")
+    tree:add(f_opcode, range)
+end
 
 function p_swp08.dissector(tvb, pinfo, root_tree)
     pinfo.cols.protocol = "SW-P-08";
