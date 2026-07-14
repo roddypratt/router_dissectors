@@ -84,31 +84,31 @@ local lengths = {
 }
 
 local p_swp02 = Proto("swp02", "Pro-Bel SW-P-02 protocol");
-local f_opcode = ProtoField.uint16("swp.op", "OpCode", base.HEX, codes);
+local f_opcode = ProtoField.uint16("swp02.op", "OpCode", base.HEX, codes);
 
-local f_name = ProtoField.string("swp.name", "Name");
+local f_name = ProtoField.string("swp02.name", "Name");
 
-local f_source = ProtoField.uint16("swp.source", "Source");
-local f_dest = ProtoField.uint16("swp.dest", "Dest");
+local f_source = ProtoField.uint16("swp02.source", "Source");
+local f_dest = ProtoField.uint16("swp02.dest", "Dest");
 
-local f_sources = ProtoField.uint16("swp.sources", "Sources");
-local f_dests = ProtoField.uint16("swp.dests", "Dests");
+local f_sources = ProtoField.uint16("swp02.sources", "Sources");
+local f_dests = ProtoField.uint16("swp02.dests", "Dests");
 
-local f_start = ProtoField.uint16("swp.start", "Start");
-local f_device = ProtoField.uint16("swp.device", "Device");
-local f_checksum = ProtoField.uint8("swp.checksum", "Checksum");
-local f_status = ProtoField.uint8("swp.status", "Status");
+local f_start = ProtoField.uint16("swp02.start", "Start");
+local f_device = ProtoField.uint16("swp02.device", "Device");
+local f_checksum = ProtoField.uint8("swp02.checksum", "Checksum");
+local f_status = ProtoField.uint8("swp02.status", "Status");
 
-local f_go = ProtoField.uint8("swp.go", "Go", base.HEX,
+local f_go = ProtoField.uint8("swp02.go", "Go", base.HEX,
     { "Set", "Clear", "None Selected" })
-local f_count = ProtoField.uint8("swp.count", "Count");
+local f_count = ProtoField.uint8("swp02.count", "Count");
 
 p_swp02.fields = {
     f_opcode, f_source, f_dest, f_device, f_checksum, f_sources, f_dests,
     f_start, f_name, f_count, f_go, f_status
 };
 
-local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
+local ef_bad_checksum = ProtoExpert.new("swp02.checksum.expert", "Bad checksum",
     expert.group.MALFORMED,
     expert.severity.ERROR);
 
@@ -142,7 +142,7 @@ function rangeSrc10(range, i)
 end
 
 function processPacket(root, range)
-    local tree = root:add(range, "SW-P-02")
+    local tree = root:add(p_swp02, range)
     local r, op = rangeByte(range, 1)
 
     tree:add(f_opcode, r, op)
