@@ -142,7 +142,7 @@ function rangeSrc10(range, i)
 end
 
 function processPacket(root, range)
-    local tree = root:add(range, "SW-P-02")
+    local tree = root:add(p_swp02, range)
     local r, op = rangeByte(range, 1)
 
     tree:add(f_opcode, r, op)
