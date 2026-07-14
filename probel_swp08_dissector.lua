@@ -149,28 +149,28 @@ local protcodes = {
 local namelengths = { [0] = 4, [1] = 8, [2] = 12, [3] = 16, [4] = 32 }
 
 local p_swp08 = Proto("swp08", "Pro-Bel SW-P-08 protocol");
-local f_opcode = ProtoField.uint16("swp.op", "OpCode", base.HEX, codes);
-local f_matrix4 = ProtoField.uint8("swp.matrix", "Matrix", base.HEX, nil, 0xF0);
-local f_matrix8 = ProtoField.uint8("swp.matrix", "Matrix");
+local f_opcode = ProtoField.uint16("swp08.op", "OpCode", base.HEX, codes);
+local f_matrix4 = ProtoField.uint8("swp08.matrix", "Matrix", base.HEX, nil, 0xF0);
+local f_matrix8 = ProtoField.uint8("swp08.matrix", "Matrix");
 
-local f_level4 = ProtoField.uint8("swp.level", "Level", base.HEX, nil, 0xF);
-local f_level8 = ProtoField.uint8("swp.level", "Level");
+local f_level4 = ProtoField.uint8("swp08.level", "Level", base.HEX, nil, 0xF);
+local f_level8 = ProtoField.uint8("swp08.level", "Level");
 
-local f_name = ProtoField.string("swp.name", "Name");
+local f_name = ProtoField.string("swp08.name", "Name");
 
-local f_source16 = ProtoField.uint16("swp.source", "Source");
+local f_source16 = ProtoField.uint16("swp08.source", "Source");
 
-local f_dest16 = ProtoField.uint16("swp.dest", "Dest");
-local f_start = ProtoField.uint16("swp.start", "Start");
-local f_device = ProtoField.uint16("swp.device", "Device");
-local f_checksum = ProtoField.uint8("swp.checksum", "Checksum");
-local f_length = ProtoField.uint8("swp.length", "Length");
-local f_count = ProtoField.uint8("swp.count", "Count");
+local f_dest16 = ProtoField.uint16("swp08.dest", "Dest");
+local f_start = ProtoField.uint16("swp08.start", "Start");
+local f_device = ProtoField.uint16("swp08.device", "Device");
+local f_checksum = ProtoField.uint8("swp08.checksum", "Checksum");
+local f_length = ProtoField.uint8("swp08.length", "Length");
+local f_count = ProtoField.uint8("swp08.count", "Count");
 
-local f_namelength = ProtoField.uint8("swp.namelength", "NameLength", base.HEX,
+local f_namelength = ProtoField.uint8("swp08.namelength", "NameLength", base.HEX,
     namelengths);
 local f_protect =
-    ProtoField.uint8("swp.protect", "Protect", base.HEX, protcodes);
+    ProtoField.uint8("swp08.protect", "Protect", base.HEX, protcodes);
 
 p_swp08.fields = {
     f_opcode, f_matrix8, f_level8, f_source16, f_dest16, f_device, f_checksum,
@@ -178,18 +178,18 @@ p_swp08.fields = {
     f_count
 };
 
-local ef_bad_length = ProtoExpert.new("swp.length.expert", "Bad length",
+local ef_bad_length = ProtoExpert.new("swp08.length.expert", "Bad length",
     expert.group.MALFORMED,
     expert.severity.ERROR);
 
-local ef_empty = ProtoExpert.new("swp.empty.expert", "Empty packet",
+local ef_empty = ProtoExpert.new("swp08.empty.expert", "Empty packet",
     expert.group.MALFORMED,
     expert.severity.WARN);
 
-local ef_bad_checksum = ProtoExpert.new("swp.checksum.expert", "Bad checksum",
+local ef_bad_checksum = ProtoExpert.new("swp08.checksum.expert", "Bad checksum",
     expert.group.MALFORMED,
     expert.severity.ERROR);
-local ef_bad_dle = ProtoExpert.new("swp.baddle.expert", "Bad DLE sequence",
+local ef_bad_dle = ProtoExpert.new("swp08.baddle.expert", "Bad DLE sequence",
     expert.group.MALFORMED, expert.severity.ERROR);
 
 p_swp08.experts = { ef_bad_length, ef_bad_checksum, ef_bad_dle, ef_empty }
