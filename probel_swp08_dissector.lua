@@ -230,7 +230,7 @@ function rangeSrc12(range, mess, i)
 end
 
 function processPacket(mess, root, range)
-    local tree = root:add(range, "SW-P-08")
+    local tree = root:add(p_swp08, range)
 
     if mess[#mess - 1] == 0 then
         tree:add_proto_expert_info(ef_empty)
@@ -377,9 +377,15 @@ function processPacket(mess, root, range)
     tree:add(f_checksum, rangeByte(range, mess, #mess))
 end
 
-function processACK(root, range) root:add(f_opcode, range) end
+function processACK(root, range)
+    local tree = root:add(p_swp08, range)
+    tree:add(f_opcode, range)
+end
 
-function processNAK(root, range) root:add(f_opcode, range) end
+function processNAK(root, range)
+    local tree = root:add(p_swp08, range)
+    tree:add(f_opcode, range)
+end
 
 function p_swp08.dissector(tvb, pinfo, root_tree)
     pinfo.cols.protocol = "SW-P-08";
