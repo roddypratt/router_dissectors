@@ -321,9 +321,10 @@ function processPacket(mess, root, range)
     elseif op == PROTECT_TALLY_DUMP_RESPONSE then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_level4, rangeByte(range, mess, 2))
-        tree:add(f_dest16, rangeWord(range, mess, 3))
-        for i = 0, 16 do
-            local r, v = rangeByte(range, mess, 4 + 2 * i)
+        tree:add(f_count, rangeByte(range, mess, 3))
+        tree:add(f_dest16, rangeWord(range, mess, 4))
+        for i = 0, mess[3] - 1 do
+            local r, v = rangeByte(range, mess, 5 + 2 * i)
             tree:add(f_protect, r, bit.rshift(v, 4))
         end
     elseif op == CROSSPOINT_TALLY_DUMP_REQUEST then
