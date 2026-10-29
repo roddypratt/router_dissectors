@@ -41,6 +41,9 @@ local EXT_CROSSPOINT_TALLY_DUMP_REQUEST = CROSSPOINT_TALLY_DUMP_REQUEST + 0x80
 local EXT_CROSSPOINT_TALLY_DUMP_RESPONSE =
     CROSSPOINT_TALLY_DUMP_RESPONSE_WORD + 0x80
 
+local EXT_PROTECT_TALLY_DUMP_REQUEST = PROTECT_TALLY_DUMP_REQUEST + 0x80
+local EXT_PROTECT_TALLY_DUMP_RESPONSE = PROTECT_TALLY_DUMP_RESPONSE + 0x80
+
 local EXT_ALL_SOURCE_NAMES = ALL_SOURCE_NAMES + 0x80
 local EXT_ALL_DESTINATION_NAMES = ALL_DESTINATION_NAMES + 0x80
 local EXT_SOURCE_NAMES_RESPONSE = SOURCE_NAMES_RESPONSE + 0x80
@@ -128,6 +131,8 @@ local codes = {
     [EXT_PROTECT_DISCONNECTED] = "EXT_PROTECT_DISCONNECTED",
     [EXT_CROSSPOINT_TALLY_DUMP_REQUEST] = "EXT_CROSSPOINT_TALLY_DUMP_REQUEST",
     [EXT_CROSSPOINT_TALLY_DUMP_RESPONSE] = "EXT_CROSSPOINT_TALLY_DUMP_RESPONSE",
+    [EXT_PROTECT_TALLY_DUMP_REQUEST] = "EXT_PROTECT_TALLY_DUMP_REQUEST",
+    [EXT_PROTECT_TALLY_DUMP_RESPONSE] = "EXT_PROTECT_TALLY_DUMP_RESPONSE",
 
     [EXT_ALL_SOURCE_NAMES] = "EXT_ALL_SOURCE_NAMES",
     [EXT_ALL_DESTINATION_NAMES] = "EXT_ALL_DESTINATION_NAMES",
@@ -318,13 +323,26 @@ function processPacket(mess, root, range)
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_level4, rangeByte(range, mess, 2))
         tree:add(f_dest16, rangeWord(range, mess, 3))
+    elseif op == EXT_PROTECT_TALLY_DUMP_REQUEST then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+        tree:add(f_dest16, rangeWord(range, mess, 4))
     elseif op == PROTECT_TALLY_DUMP_RESPONSE then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_level4, rangeByte(range, mess, 2))
         tree:add(f_count, rangeByte(range, mess, 3))
         tree:add(f_dest16, rangeWord(range, mess, 4))
         for i = 0, mess[3] - 1 do
-            local r, v = rangeByte(range, mess, 5 + 2 * i)
+            local r, v = rangeByte(range, mess, 6 + 2 * i)
+            tree:add(f_protect, r, bit.rshift(v, 4))
+        end
+    elseif op == EXT_PROTECT_TALLY_DUMP_RESPONSE then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+        tree:add(f_count, rangeByte(range, mess, 4))
+        tree:add(f_dest16, rangeWord(range, mess, 5))
+        for i = 0, mess[4] - 1 do
+            local r, v = rangeByte(range, mess, 7 + 2 * i)
             tree:add(f_protect, r, bit.rshift(v, 4))
         end
     elseif op == CROSSPOINT_TALLY_DUMP_REQUEST then
@@ -401,9 +419,12 @@ function lookForPacket(tvb, root_tree, startpos)
     local bytes = tvb:bytes();
     local len = bytes:len()
 
-    if len < 2 then return startpos end
-
     local p = startpos
+    if p >= len then return p end
+    if len - p < 2 then
+        if bytes:get_index(p) == DLE then return p end
+        return p, 1
+    end
 
     if (bytes:get_index(p) == DLE) and (bytes:get_index(p + 1) == ACK) then
         processACK(root_tree, tvb:range(p, 2))
