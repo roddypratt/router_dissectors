@@ -20,6 +20,11 @@ local CROSSPOINT_TALLY_DUMP_REQUEST = 21
 local CROSSPOINT_TALLY_DUMP_RESPONSE_BYTE = 22
 local CROSSPOINT_TALLY_DUMP_RESPONSE_WORD = 23
 
+local BUSY_STATUS = 86
+local IMPLEMENTATION_REQUEST = 97
+local IMPLEMENTATION_RESPONSE = 98
+local INVALID_MESSAGE = 99
+
 local ALL_SOURCE_NAMES = 100
 local ALL_DESTINATION_NAMES = 102
 local SOURCE_NAMES_RESPONSE = 106
@@ -88,10 +93,15 @@ local codes = {
     [78] = "LOGGING_STRINGS",
     [79] = "ERROR_STATUS_REQUEST",
 
+    [BUSY_STATUS] = "BUSY_STATUS",
     [87] = "SOFT_KEY_TALLY_REQUEST",
     [88] = "SOFT_KEY_TALLY_RESPONSE",
     [89] = "SOFT_KEY_ASSIGNEMENT_SET_REQUEST",
     [90] = "SOFT_KEY_ASSIGNEMENT_SET_RESPONSE",
+
+    [IMPLEMENTATION_REQUEST] = "IMPLEMENTATION_REQUEST",
+    [IMPLEMENTATION_RESPONSE] = "IMPLEMENTATION_RESPONSE",
+    [INVALID_MESSAGE] = "INVALID_MESSAGE",
 
     [ALL_SOURCE_NAMES] = "ALL_SOURCE_NAMES",
     [101] = "SINGLE_SOURCE_NAME",
@@ -302,15 +312,20 @@ function processPacket(mess, root, range)
         end
     elseif op == EXT_SOURCE_NAMES_RESPONSE or op == EXT_DESTINATION_NAMES_RESPONSE then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
-        tree:add(f_level8, rangeByte(range, mess, 3))
-        tree:add(f_namelength, rangeByte(range, mess, 4))
-        tree:add(f_start, rangeWord(range, mess, 5))
-        tree:add(f_count, rangeByte(range, mess, 7))
+        local base = 1
+        if op == EXT_DESTINATION_NAMES_RESPONSE then
+            base = 0
+        else
+            tree:add(f_level8, rangeByte(range, mess, 3))
+        end
+        tree:add(f_namelength, rangeByte(range, mess, 3 + base))
+        tree:add(f_start, rangeWord(range, mess, 4 + base))
+        tree:add(f_count, rangeByte(range, mess, 6 + base))
 
-        local len = namelengths[mess[4]];
+        local len = namelengths[mess[3 + base]];
 
-        for i = 0, mess[7] - 1 do
-            tree:add(f_name, rangeString(range, mess, 8 + (i * len), len))
+        for i = 0, mess[6 + base] - 1 do
+            tree:add(f_name, rangeString(range, mess, 7 + base + (i * len), len))
         end
     elseif op == ALL_SOURCE_NAMES or op == ALL_DESTINATION_NAMES or op == EXT_ALL_DESTINATION_NAMES then
         tree:add(f_matrix4, rangeByte(range, mess, 2))
@@ -378,7 +393,21 @@ function processPacket(mess, root, range)
         for i = 0, count - 1 do
             tree:add(f_source16, rangeWord(range, mess, 7 + i * 2))
         end
+    elseif op == IMPLEMENTATION_RESPONSE then
+        tree:add(f_count, rangeByte(range, mess, 2))
+
+        local incount = mess[2]
+
+        for i = 0, incount - 1 do
+            tree:add(f_opcode, rangeByte(range, mess, 4 + i))
+        end
+        tree:add(f_count, rangeByte(range, mess, 3))
+        local outcount = mess[3]
+        for i = 0, outcount - 1 do
+            tree:add(f_opcode, rangeByte(range, mess, 4 + incount + i))
+        end
     end
+
 
     tree:add(f_length, rangeByte(range, mess, #mess - 1))
     if (#mess - 2) ~= mess[#mess - 1] then
