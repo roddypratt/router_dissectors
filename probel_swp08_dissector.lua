@@ -30,6 +30,9 @@ local ALL_DESTINATION_NAMES = 102
 local SOURCE_NAMES_RESPONSE = 106
 local DESTINATION_NAMES_RESPONSE = 107
 
+local SINGLE_SOURCE_NAME = 101
+local SINGLE_DESTINATION_NAME = 103
+
 local EXT_CROSSPOINT_INTERROGATE = CROSSPOINT_INTERROGATE + 0x80;
 local EXT_CROSSPOINT_CONNECT = CROSSPOINT_CONNECT + 0x80;
 local EXT_CROSSPOINT_TALLY = CROSSPOINT_TALLY + 0x80;
@@ -53,6 +56,9 @@ local EXT_ALL_SOURCE_NAMES = ALL_SOURCE_NAMES + 0x80
 local EXT_ALL_DESTINATION_NAMES = ALL_DESTINATION_NAMES + 0x80
 local EXT_SOURCE_NAMES_RESPONSE = SOURCE_NAMES_RESPONSE + 0x80
 local EXT_DESTINATION_NAMES_RESPONSE = DESTINATION_NAMES_RESPONSE + 0x80
+
+local EXT_SINGLE_SOURCE_NAME = SINGLE_SOURCE_NAME + 0x80
+local EXT_SINGLE_DESTINATION_NAME = SINGLE_DESTINATION_NAME + 0x80
 
 local codes = {
     [0] = "COMMAND_ENABLE",
@@ -104,9 +110,9 @@ local codes = {
     [INVALID_MESSAGE] = "INVALID_MESSAGE",
 
     [ALL_SOURCE_NAMES] = "ALL_SOURCE_NAMES",
-    [101] = "SINGLE_SOURCE_NAME",
+    [SINGLE_SOURCE_NAME] = "SINGLE_SOURCE_NAME",
     [ALL_DESTINATION_NAMES] = "ALL_DESTINATION_NAMES",
-    [103] = "SINGLE_DESTINATION_NAME",
+    [SINGLE_DESTINATION_NAME] = "SINGLE_DESTINATION_NAME",
     [104] = "ALL_UMD_LABELS",
     [105] = "SINGLE_UMD_LABEL",
     [SOURCE_NAMES_RESPONSE] = "SOURCE_NAMES_RESPONSE",
@@ -148,6 +154,9 @@ local codes = {
     [EXT_ALL_DESTINATION_NAMES] = "EXT_ALL_DESTINATION_NAMES",
     [EXT_SOURCE_NAMES_RESPONSE] = "EXT_SOURCE_NAMES_RESPONSE",
     [EXT_DESTINATION_NAMES_RESPONSE] = "EXT_DESTINATION_NAMES_RESPONSE",
+
+    [EXT_SINGLE_DESTINATION_NAME] = "EXT_SINGLE_DESTINATION_NAME",
+    [EXT_SINGLE_SOURCE_NAME] = "EXT_SINGLE_SOURCE_NAME",
 
     [0x1006] = "ACK",
     [0x1015] = "NAK"
@@ -269,6 +278,24 @@ function processPacket(mess, root, range)
         tree:add(f_matrix4, rangeByte(range, mess, 2))
         tree:add(f_level4, rangeByte(range, mess, 2))
         tree:add(f_device, rangeByte(range, mess, 5))
+    elseif op == SINGLE_DESTINATION_NAME or op == SINGLE_SOURCE_NAME then
+        tree:add(f_matrix4, rangeByte(range, mess, 2))
+        tree:add(f_level4, rangeByte(range, mess, 2))
+        tree:add(f_namelength, rangeByte(range, mess, 3))
+        if op == SINGLE_SOURCE_NAME then
+            tree:add(f_source16, rangeWord(range, mess, 4))
+        elseif op == SINGLE_DESTINATION_NAME then
+            tree:add(f_dest16, rangeWord(range, mess, 4))
+        end
+    elseif op == EXT_SINGLE_DESTINATION_NAME or op == EXT_SINGLE_SOURCE_NAME then
+        tree:add(f_matrix8, rangeByte(range, mess, 2))
+        tree:add(f_level8, rangeByte(range, mess, 3))
+        tree:add(f_namelength, rangeByte(range, mess, 4))
+        if op == EXT_SINGLE_SOURCE_NAME then
+            tree:add(f_source16, rangeWord(range, mess, 5))
+        elseif op == EXT_SINGLE_DESTINATION_NAME then
+            tree:add(f_dest16, rangeWord(range, mess, 5))
+        end
     elseif op == EXT_CROSSPOINT_INTERROGATE or op == EXT_PROTECT_INTERROGATE then
         tree:add(f_matrix8, rangeByte(range, mess, 2))
         tree:add(f_level8, rangeByte(range, mess, 3))
